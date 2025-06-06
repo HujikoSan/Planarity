@@ -1,8 +1,11 @@
 import unittest
-from planarity import on_segment, orientation, do_lines_intersect, get_crossing_edges # Updated import
+from planarity import (
+    on_segment, orientation, do_lines_intersect, get_crossing_edges,
+    is_connected, generate_random_planar_graph # New imports
+)
 
 class TestLineIntersection(unittest.TestCase):
-    # No changes needed for TestLineIntersection, as do_lines_intersect remains the same.
+    # No changes for TestLineIntersection
     # p1, q1, p2, q2
     # Segment 1: (p1, q1), Segment 2: (p2, q2)
 
@@ -147,3 +150,115 @@ class TestGetCrossingEdges(unittest.TestCase): # Renamed class
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestIsConnected(unittest.TestCase):
+    def test_empty_graph(self):
+        self.assertTrue(is_connected([], 0), "Empty graph (0 vertices) should be connected.")
+
+    def test_single_vertex_graph(self):
+        self.assertTrue(is_connected([], 1), "Single vertex graph should be connected.")
+
+    def test_two_vertices_no_edge(self):
+        self.assertFalse(is_connected([], 2), "Two vertices, no edge, should be disconnected.")
+
+    def test_two_vertices_with_edge(self):
+        self.assertTrue(is_connected([tuple(sorted((0,1)))], 2), "Two vertices with an edge should be connected.")
+
+    def test_cycle_graph_connected(self):
+        n = 4
+        edges = [tuple(sorted((i, (i + 1) % n))) for i in range(n)]
+        self.assertTrue(is_connected(edges, n), "Cycle graph C4 should be connected.")
+        n = 5
+        edges = [tuple(sorted((i, (i + 1) % n))) for i in range(n)]
+        self.assertTrue(is_connected(edges, n), "Cycle graph C5 should be connected.")
+
+    def test_disconnected_two_triangles(self):
+        edges = [
+            tuple(sorted((0,1))), tuple(sorted((1,2))), tuple(sorted((2,0))), # Triangle 1
+            tuple(sorted((3,4))), tuple(sorted((4,5))), tuple(sorted((5,3)))  # Triangle 2
+        ]
+        self.assertFalse(is_connected(edges, 6), "Two separate triangles should be disconnected.")
+
+    def test_graph_with_isolated_vertex(self):
+        edges = [tuple(sorted((0,1))), tuple(sorted((1,2))), tuple(sorted((2,0)))] # Triangle
+        # Vertex 3 is isolated
+        self.assertFalse(is_connected(edges, 4), "Graph with an isolated vertex should be disconnected.")
+
+    def test_larger_connected_graph(self):
+        # Simple line graph (path graph) P5
+        edges = [tuple(sorted((0,1))), tuple(sorted((1,2))), tuple(sorted((2,3))), tuple(sorted((3,4)))]
+        self.assertTrue(is_connected(edges, 5), "Path graph P5 should be connected.")
+
+
+class TestGenerateRandomPlanarGraph(unittest.TestCase):
+    def _run_graph_generation_test(self, n_vertices):
+        print(f"Testing graph generation for n_vertices = {n_vertices}") # Added print for long tests
+        vertices, edges = generate_random_planar_graph(n_vertices)
+
+        self.assertEqual(len(vertices), n_vertices, f"Expected {n_vertices} vertices, got {len(vertices)}")
+
+        m = len(edges)
+        # print(f"  n={n_vertices}, m={m}") # Debug print
+
+        if n_vertices == 0:
+            self.assertEqual(m, 0, f"n=0, expected 0 edges, got {m}")
+        elif n_vertices == 1:
+            self.assertEqual(m, 0, f"n=1, expected 0 edges, got {m}")
+        elif n_vertices == 2:
+            self.assertEqual(m, 1, f"n=2, expected 1 edge, got {m}")
+            if m == 1: # check content if edge count is correct
+                 self.assertIn(tuple(sorted((0,1))), edges, "Edge (0,1) missing for n=2")
+        elif n_vertices >= 3:
+            max_possible_edges_triangulation = 3 * n_vertices - 6
+            # Target is 0.8 to 1.0 of these edges.
+            min_target_edges = int(0.8 * max_possible_edges_triangulation)
+            min_for_connectivity = n_vertices - 1
+
+            lower_bound = max(min_for_connectivity, min_target_edges)
+            # Upper bound is the number of edges in a full triangulation
+            upper_bound = max_possible_edges_triangulation
+
+            self.assertTrue(lower_bound <= m <= upper_bound,
+                            f"For n={n_vertices}, edges {m} not in range [{lower_bound}, {upper_bound}]")
+
+            # Check connectivity for n > 0 or if n=0 and m=0
+            if n_vertices > 0 : # (n=0 case covered by specific edge check)
+                 self.assertTrue(is_connected(edges, len(vertices)),
+                                f"Graph with n={n_vertices} and m={m} edges not connected.")
+
+        # Check for canonical edge format (u < v) and uniqueness (implicitly by set in generation)
+        for u, v in edges:
+            self.assertTrue(u < v, f"Edge {(u,v)} not in canonical form (u < v).")
+        self.assertEqual(len(edges), len(set(edges)), "Duplicate edges found.")
+
+
+    def test_generate_n0(self):
+        self._run_graph_generation_test(0)
+
+    def test_generate_n1(self):
+        self._run_graph_generation_test(1)
+
+    def test_generate_n2(self):
+        self._run_graph_generation_test(2)
+
+    def test_generate_n3(self):
+        self._run_graph_generation_test(3) # Triangulation: 3 edges. Target: max(2, int(0.8*3)=2) to 3. Range [2,3]
+                                           # Corrected: Triangulation for n=3 is 3 edges. Target: max(2, int(0.8*3)=2) to 3. Range [2,3].
+                                           # After fix in planarity.py (num_edges_target = max(min_edges_for_connected, num_edges_target))
+                                           # max_edges_for_triangulation = 3*3-6 = 3.
+                                           # min_target_edges = int(0.8 * 3) = 2.
+                                           # min_for_connectivity = 3-1 = 2.
+                                           # lower_bound = max(2,2) = 2. upper_bound = 3. Range [2,3].
+
+    def test_generate_n4(self):
+        self._run_graph_generation_test(4) # Triangulation: 6 edges. Target: max(3, int(0.8*6)=4) to 6. Range [4,6]
+
+    def test_generate_n5(self):
+        self._run_graph_generation_test(5) # Triangulation: 9 edges. Target: max(4, int(0.8*9)=7) to 9. Range [7,9]
+
+    def test_generate_n10(self):
+        self._run_graph_generation_test(10) # Triangulation: 24 edges. Target: max(9, int(0.8*24)=19) to 24. Range [19,24]
+
+    def test_generate_n20(self):
+        self._run_graph_generation_test(20) # Triangulation: 54 edges. Target: max(19, int(0.8*54)=43) to 54. Range [43,54]
