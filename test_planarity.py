@@ -210,27 +210,46 @@ class TestGenerateRandomPlanarGraph(unittest.TestCase):
             if m == 1: # check content if edge count is correct
                  self.assertIn(tuple(sorted((0,1))), edges, "Edge (0,1) missing for n=2")
         elif n_vertices >= 3:
+            # Calculate degrees first for assertions
+            degrees = [0] * len(vertices)
+            if n_vertices > 0 : # proceed only if there are vertices to calculate degrees for
+                for u_edge, v_edge in edges:
+                    degrees[u_edge] += 1
+                    degrees[v_edge] += 1
+
             max_possible_edges_triangulation = 3 * n_vertices - 6
-            # Target is 0.8 to 1.0 of these edges.
             min_target_edges = int(0.8 * max_possible_edges_triangulation)
             min_for_connectivity = n_vertices - 1
 
-            lower_bound = max(min_for_connectivity, min_target_edges)
-            # Upper bound is the number of edges in a full triangulation
-            upper_bound = max_possible_edges_triangulation
+            lower_bound_edges = max(min_for_connectivity, min_target_edges)
+            upper_bound_edges = max_possible_edges_triangulation
 
-            self.assertTrue(lower_bound <= m <= upper_bound,
-                            f"For n={n_vertices}, edges {m} not in range [{lower_bound}, {upper_bound}]")
+            self.assertTrue(lower_bound_edges <= m <= upper_bound_edges,
+                            f"For n={n_vertices}, edges {m} not in range [{lower_bound_edges}, {upper_bound_edges}]")
 
-            # Check connectivity for n > 0 or if n=0 and m=0
-            if n_vertices > 0 : # (n=0 case covered by specific edge check)
+            if n_vertices > 0:
                  self.assertTrue(is_connected(edges, len(vertices)),
                                 f"Graph with n={n_vertices} and m={m} edges not connected.")
 
+            # Degree assertions
+            if n_vertices == 3:
+                self.assertEqual(m, 3, f"n=3, expected 3 edges, got {m}") # Should be exactly a triangle
+                if len(vertices) == 3: # Ensure degrees list is valid before checking
+                    self.assertTrue(all(d == 2 for d in degrees), f"n=3, expected all degrees to be 2, got {degrees}")
+            elif n_vertices == 4:
+                # For n=4, triangulation is K4 (6 edges). Min degree constraint (all deg=3) prevents removal.
+                self.assertEqual(m, 6, f"n=4, expected 6 edges (K4), got {m}")
+                if len(vertices) == 4:
+                    self.assertTrue(all(d == 3 for d in degrees), f"n=4, expected all degrees to be 3 (K4), got {degrees}")
+            elif n_vertices >= 5: # For n >= 5, check min degree is at least 3
+                if len(vertices) == n_vertices and n_vertices > 0 : # Check if degrees list is valid
+                    self.assertTrue(all(d >= 3 for d in degrees), f"n={n_vertices}, expected all degrees >= 3, got {degrees}")
+
         # Check for canonical edge format (u < v) and uniqueness (implicitly by set in generation)
-        for u, v in edges:
-            self.assertTrue(u < v, f"Edge {(u,v)} not in canonical form (u < v).")
-        self.assertEqual(len(edges), len(set(edges)), "Duplicate edges found.")
+        if n_vertices > 0 : # Only if there are edges to check
+            for u, v in edges:
+                self.assertTrue(u < v, f"Edge {(u,v)} not in canonical form (u < v).")
+            self.assertEqual(len(edges), len(set(edges)), "Duplicate edges found.")
 
 
     def test_generate_n0(self):

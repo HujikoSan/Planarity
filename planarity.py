@@ -165,6 +165,8 @@ def generate_random_planar_graph(n): # n is num_vertices
             current_edges_for_check = list(final_edges) # Start with all triangulation edges
 
             removed_count = 0
+            MIN_DEGREE_TO_ALLOW_REMOVAL = 3 # Edge can be removed only if endpoint degrees are > 3
+
             for edge_candidate in potential_edges_to_remove:
                 if removed_count >= num_to_remove:
                     break # Removed enough edges
@@ -172,11 +174,30 @@ def generate_random_planar_graph(n): # n is num_vertices
                 if len(current_edges_for_check) <= min_edges_for_connected: # Safety break
                     break
 
-                # Try removing the edge
+                # Check if this edge is still in the graph (it might have been added back and then re-selected)
+                # This check is implicitly handled if current_edges_for_check.remove(edge_candidate) raises ValueError,
+                # but explicit check is safer if potential_edges_to_remove contains duplicates or stale entries.
+                # However, potential_edges_to_remove is a shuffled copy of initial final_edges.
+                # An edge is only processed once from potential_edges_to_remove.
+                # If it's put back, it's into current_edges_for_check, not potential_edges_to_remove. So this is fine.
+
+                u, v = edge_candidate
+
+                # Calculate current degrees of u and v based on current_edges_for_check
+                degree_u = sum(1 for edge in current_edges_for_check if u in edge)
+                degree_v = sum(1 for edge in current_edges_for_check if v in edge)
+
+                # Apply Degree Constraint:
+                # If removing this edge would make degree_u or degree_v <= 2 (i.e. current degree is <=3)
+                # then this edge cannot be removed.
+                if degree_u <= MIN_DEGREE_TO_ALLOW_REMOVAL or degree_v <= MIN_DEGREE_TO_ALLOW_REMOVAL:
+                    continue # Skip to the next candidate edge
+
+                # Try removing the edge (if degree constraint passes)
                 current_edges_for_check.remove(edge_candidate)
 
                 if is_connected(current_edges_for_check, n):
-                    # Removal is successful, keep it removed (already removed from current_edges_for_check)
+                    # Removal is successful (maintains connectivity and degree constraint met)
                     removed_count += 1
                 else:
                     # Removal failed (disconnected graph), add it back
@@ -333,7 +354,7 @@ def main_game():
 
     selected_vertex_index = None
     mouse_button_down = False
-    crossing_edges_set = get_crossing_edges(graph_vertices, graph_edges) # Store the set of crossing edges
+    crossing_edges_set = get_crossing_edges(graph_vertices, graph_edges)
 
     running = True
     while running:
