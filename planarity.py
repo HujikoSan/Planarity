@@ -102,16 +102,61 @@ def is_connected(edges_list,num_vertices):
             if v_neighbor not in visited: visited.add(v_neighbor); q.append(v_neighbor)
     return count == num_vertices
 
-def capture_game_view(screen_w, screen_h, bg_color, verts, edgs, cross_set, v_rad, v_clr, cross_clr, non_cross_clr, filename="planarity_screenshot.png"):
-    surf = pygame.Surface((screen_w, screen_h)); surf.fill(bg_color)
-    for e_idx, e_val in enumerate(edgs): # Corrected iteration
-        if not (0 <= e_val[0] < len(verts) and 0 <= e_val[1] < len(verts)): continue
-        sp, ep = verts[e_val[0]], verts[e_val[1]]
-        clr = cross_clr if e_val in cross_set else non_cross_clr
-        pygame.draw.line(surf, clr, sp, ep, 2)
-    for vp in verts: pygame.draw.circle(surf, v_clr, vp, v_rad)
-    try: pygame.image.save(surf,filename); print(f"Screenshot: {filename}"); return filename
-    except Exception as e: print(f"Screenshot error: {e}"); return None
+def capture_game_view(screen_w_param, screen_h_param, bg_color,
+                        verts_param, edges_param,
+                        cross_set_param, vert_radius_param,
+                        vertex_clr_param, crossing_edge_clr_param, non_crossing_edge_clr_param,
+                        num_v_stat, num_e_stat, elapsed_t_stat, # New parameters for stats
+                        filename="planarity_screenshot.png"):
+    """
+    Creates an image of the current graph view (vertices, edges, and stats)
+    and saves it to a file.
+    """
+    capture_surface = pygame.Surface((screen_w_param, screen_h_param))
+    capture_surface.fill(bg_color)
+
+    # Draw edges
+    for edge_tuple in edges_param:
+        if not (0 <= edge_tuple[0] < len(verts_param) and 0 <= edge_tuple[1] < len(verts_param)):
+            # print(f"Warning: Edge {edge_tuple} has out-of-bounds vertex indices for screenshot. Skipping.") # Optional debug
+            continue
+        start_pos = verts_param[edge_tuple[0]]
+        end_pos = verts_param[edge_tuple[1]]
+
+        edge_color = crossing_edge_clr_param if edge_tuple in cross_set_param else non_crossing_edge_clr_param
+        pygame.draw.line(capture_surface, edge_color, start_pos, end_pos, 2)
+
+    # Draw vertices
+    for vertex_pos in verts_param:
+        pygame.draw.circle(capture_surface, vertex_clr_param, vertex_pos, vert_radius_param)
+
+    # Draw stats text
+    stats_capture_font = None
+    try:
+        stats_capture_font = pygame.font.Font(None, 24) # Small font for stats
+    except Exception as e:
+        print(f"Failed to load font for screenshot stats: {e}")
+
+    if stats_capture_font:
+        texts_to_render = [
+            f"Vertices: {num_v_stat}",
+            f"Edges: {num_e_stat}",
+            f"Time: {elapsed_t_stat:.1f}s"
+        ]
+        line_height = stats_capture_font.get_height() + 2 # +2 for a little padding
+        current_y_text = 5 # Start 5 pixels from the top
+        for text_str in texts_to_render:
+            text_surface = stats_capture_font.render(text_str, True, BLACK) # Black text for stats
+            capture_surface.blit(text_surface, (5, current_y_text)) # 5 pixels from the left
+            current_y_text += line_height
+
+    try:
+        pygame.image.save(capture_surface, filename)
+        print(f"Screenshot saved to {filename}")
+        return filename
+    except Exception as e:
+        print(f"Error saving screenshot: {e}")
+        return None
 
 def draw_graph(screen_s, g_verts, g_edges, v_rad, cross_s=None):
     if cross_s is None: cross_s=set()
@@ -196,7 +241,7 @@ def main_game_session(screen, win_fnt, stats_fnt, fixed_n_v=None):
             if ev.type==pygame.QUIT: return "QUIT",None
             if ev.type==pygame.MOUSEBUTTONDOWN:
                 if ev.button==1: # LEFT CLICK - Vertex interaction
-                    if not g_won and not paused:
+                    if not paused: # Allow vertex selection if not paused (regardless of win state)
                         m_down=True; mx,my=ev.pos
                         for i,(vx,vy) in enumerate(g_v):
                             if ((vx-mx)**2+(vy-my)**2)**0.5 < VERTEX_RADIUS: sel_v_idx=i;break
@@ -210,21 +255,34 @@ def main_game_session(screen, win_fnt, stats_fnt, fixed_n_v=None):
                         if r_btn_r and r_btn_r.collidepoint(ev.pos): return "RESTART",None
                         elif rs_btn_r and rs_btn_r.collidepoint(ev.pos): return "RESTART_SAME",n_v_sess
                         elif cap_btn_r and cap_btn_r.collidepoint(ev.pos):
-                            sf=capture_game_view(SCREEN_WIDTH,SCREEN_HEIGHT,WHITE,g_v,g_e,cross_set,VERTEX_RADIUS,RED_VERTEX,RED_EDGE_CROSSING,GREEN_EDGE_NON_CROSSING)
+                            sf = capture_game_view(
+                                SCREEN_WIDTH, SCREEN_HEIGHT, WHITE, g_v, g_e, cross_set,
+                                VERTEX_RADIUS, RED_VERTEX, RED_EDGE_CROSSING, GREEN_EDGE_NON_CROSSING,
+                                n_v_sess, len(g_e), elap_s # Pass stats here
+                            )
                             if sf and stats_fnt: scr_msg_surf=stats_fnt.render(f"Saved: {sf}",True,BLACK); scr_msg_until=c_ticks+3000
                         elif px_btn_r and px_btn_r.collidepoint(ev.pos):
-                            capture_game_view(SCREEN_WIDTH,SCREEN_HEIGHT,WHITE,g_v,g_e,cross_set,VERTEX_RADIUS,RED_VERTEX,RED_EDGE_CROSSING,GREEN_EDGE_NON_CROSSING)
+                            sf_for_x = capture_game_view(
+                                SCREEN_WIDTH, SCREEN_HEIGHT, WHITE, g_v, g_e, cross_set,
+                                VERTEX_RADIUS, RED_VERTEX, RED_EDGE_CROSSING, GREEN_EDGE_NON_CROSSING,
+                                n_v_sess, len(g_e), elap_s # Pass stats here
+                            )
+                            if sf_for_x and stats_fnt:
+                                scr_msg_surf = stats_fnt.render(f"Captured! Posting to X...", True, BLACK)
+                                scr_msg_until = c_ticks + 2000 # Shorter message for X post
                             tw=f"Solved Planarity: {n_v_sess}V, {len(g_e)}E, {elap_s:.1f}s! #PlanarityGame"; webbrowser.open_new_tab(f"https://x.com/intent/post?text={urllib.parse.quote(tw)}")
             elif ev.type==pygame.MOUSEBUTTONUP and ev.button==1:
                 m_down=False
-                if not g_won and not paused and sel_v_idx is not None: cross_set=get_crossing_edges(g_v,g_e)
+                if not paused and sel_v_idx is not None: # Update crossings if a vertex was moved, if not paused
+                    cross_set=get_crossing_edges(g_v,g_e)
                 sel_v_idx=None
             elif ev.type==pygame.MOUSEMOTION:
-                if not g_won and not paused and m_down and sel_v_idx is not None:
+                if not paused and m_down and sel_v_idx is not None: # Allow dragging if not paused (win state doesn't prevent)
                     mx,my=ev.pos;g_v[sel_v_idx]=(max(VERTEX_RADIUS,min(mx,SCREEN_WIDTH-VERTEX_RADIUS)),max(VERTEX_RADIUS,min(my,SCREEN_HEIGHT-VERTEX_RADIUS)))
-                    cross_set=get_crossing_edges(g_v,g_e)
+                    cross_set=get_crossing_edges(g_v,g_e) # Live update of crossings
 
         screen.fill(WHITE); draw_graph(screen,g_v,g_e,VERTEX_RADIUS,cross_set)
+        # Set game_won flag only once if conditions are met
         if not g_won and not paused and not cross_set:
             g_won=True
             if g_won and not r_btn_r: # Define win screen button rects once
