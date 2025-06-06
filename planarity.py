@@ -27,26 +27,17 @@ MIN_VERTICES = 3
 MAX_VERTICES = 20
 
 def get_num_vertices_from_user():
-    """Prompts the user for the number of vertices and validates input."""
     num_vertices = DEFAULT_NUM_VERTICES
     try:
-        raw_input_str = input(f"Enter the number of vertices ({MIN_VERTICES}-{MAX_VERTICES}, default: {DEFAULT_NUM_VERTICES}): ")
+        raw_input_str = input(f"Enter # vertices ({MIN_VERTICES}-{MAX_VERTICES}, def: {DEFAULT_NUM_VERTICES}): ")
         val = int(raw_input_str)
-        if MIN_VERTICES <= val <= MAX_VERTICES:
-            num_vertices = val
-            print(f"Using {num_vertices} vertices.")
-        else:
-            print(f"Input out of range. Using default: {DEFAULT_NUM_VERTICES} vertices.")
-            num_vertices = DEFAULT_NUM_VERTICES
-    except ValueError:
-        print(f"Invalid integer input. Using default: {DEFAULT_NUM_VERTICES} vertices.")
-        num_vertices = DEFAULT_NUM_VERTICES
-    except EOFError:
-        print(f"No input received (EOF). Using default: {DEFAULT_NUM_VERTICES} vertices.")
-        num_vertices = DEFAULT_NUM_VERTICES
+        if MIN_VERTICES <= val <= MAX_VERTICES: num_vertices = val
+        else: print(f"Input out of range. Using default: {DEFAULT_NUM_VERTICES}.")
+    except ValueError: print(f"Invalid input. Using default: {DEFAULT_NUM_VERTICES}.")
+    except EOFError: print(f"No input (EOF). Using default: {DEFAULT_NUM_VERTICES}.")
     return num_vertices
 
-def generate_random_planar_graph(n): # n is num_vertices
+def generate_random_planar_graph(n):
     vertices = []
     edges = []
     min_dist_sq = 50**2
@@ -57,21 +48,12 @@ def generate_random_planar_graph(n): # n is num_vertices
                               random.randint(VERTEX_RADIUS, SCREEN_HEIGHT - VERTEX_RADIUS))
             too_close = False
             for v_pos in vertices:
-                dist_sq = (new_vertex_pos[0] - v_pos[0])**2 + (new_vertex_pos[1] - v_pos[1])**2
-                if dist_sq < min_dist_sq:
-                    too_close = True
-                    break
-            if not too_close:
-                vertices.append(new_vertex_pos)
-                placed = True
-                break
-        if not placed:
-            print(f"Warning: Could not place vertex {i+1} ideally. Appending possibly overlapping vertex.")
-            vertices.append(new_vertex_pos)
+                if ((new_vertex_pos[0]-v_pos[0])**2 + (new_vertex_pos[1]-v_pos[1])**2) < min_dist_sq:
+                    too_close = True; break
+            if not too_close: vertices.append(new_vertex_pos); placed = True; break
+        if not placed: vertices.append(new_vertex_pos) # Add anyway if no ideal spot
 
-    if len(vertices) != n:
-        print(f"Error: Only {len(vertices)} out of {n} vertices were generated. Graph may be smaller.")
-        n = len(vertices)
+    if len(vertices) != n: n = len(vertices)
 
     if n == 0: return [], []
     if n == 1: return vertices, []
@@ -79,284 +61,206 @@ def generate_random_planar_graph(n): # n is num_vertices
         if len(vertices) == 2: edges.append(tuple(sorted((0,1))))
         return vertices, edges
 
-    v0, v1, v2 = 0, 1, 2
-    initial_edges = [tuple(sorted((v0,v1))), tuple(sorted((v1,v2))), tuple(sorted((v2,v0)))]
-    edges.extend(initial_edges)
-    faces = [(v0, v1, v2)]
+    v0,v1,v2 = 0,1,2; initial_edges=[tuple(sorted((v0,v1))),tuple(sorted((v1,v2))),tuple(sorted((v2,v0)))]
+    edges.extend(initial_edges); faces = [(v0,v1,v2)]
 
-    for k in range(3, n):
-        if not faces:
-            print(f"Error: No faces available to insert vertex {k}. Stopping.")
-            break
-        face_to_split_idx = random.randrange(len(faces))
-        a,b,c = faces.pop(face_to_split_idx)
-        v_k = k
-        edges.extend([tuple(sorted((v_k,a))), tuple(sorted((v_k,b))), tuple(sorted((v_k,c)))])
-        faces.extend([(v_k,a,b), (v_k,b,c), (v_k,c,a)])
+    for k in range(3,n):
+        if not faces: break
+        a,b,c = faces.pop(random.randrange(len(faces)))
+        edges.extend([tuple(sorted((k,a))),tuple(sorted((k,b))),tuple(sorted((k,c)))])
+        faces.extend([(k,a,b),(k,b,c),(k,c,a)])
 
     final_edges = list(set(edges))
-
     if n >= 3:
-        min_edges_for_connected = n - 1 if n > 0 else 0
-        num_edges_target = int(random.uniform(0.8, 1.0) * len(final_edges))
-        num_edges_target = max(min_edges_for_connected, num_edges_target)
-        num_to_remove = len(final_edges) - num_edges_target
-
-        if num_to_remove > 0:
-            potential_edges_to_remove = list(final_edges)
-            random.shuffle(potential_edges_to_remove)
-            current_edges_for_check = list(final_edges)
-            removed_count = 0
-            MIN_DEGREE_TO_ALLOW_REMOVAL = 3
-
-            for edge_candidate in potential_edges_to_remove:
-                if removed_count >= num_to_remove or len(current_edges_for_check) <= min_edges_for_connected:
-                    break
-                u, v = edge_candidate
-                degree_u = sum(1 for edge in current_edges_for_check if u in edge)
-                degree_v = sum(1 for edge in current_edges_for_check if v in edge)
-                if degree_u <= MIN_DEGREE_TO_ALLOW_REMOVAL or degree_v <= MIN_DEGREE_TO_ALLOW_REMOVAL:
-                    continue
-
-                if edge_candidate not in current_edges_for_check: continue # Already removed by an earlier operation on a shared vertex? Unlikely with current logic.
-                current_edges_for_check.remove(edge_candidate)
-
-                if is_connected(current_edges_for_check, n):
-                    removed_count += 1
-                else:
-                    current_edges_for_check.append(edge_candidate)
-            final_edges = current_edges_for_check
-
+        min_conn = n-1 if n>0 else 0; target_edges = max(min_conn, int(random.uniform(0.8,1.0)*len(final_edges)))
+        to_remove = len(final_edges) - target_edges
+        if to_remove > 0:
+            shuffled_edges = list(final_edges); random.shuffle(shuffled_edges)
+            current_graph_edges = list(final_edges); removed_count = 0
+            for edge_cand in shuffled_edges:
+                if removed_count >= to_remove or len(current_graph_edges) <= min_conn: break
+                u,v = edge_cand
+                deg_u = sum(1 for e in current_graph_edges if u in e)
+                deg_v = sum(1 for e in current_graph_edges if v in e)
+                if deg_u<=3 or deg_v<=3: continue
+                if edge_cand not in current_graph_edges: continue
+                current_graph_edges.remove(edge_cand)
+                if is_connected(current_graph_edges,n): removed_count+=1
+                else: current_graph_edges.append(edge_cand)
+            final_edges = current_graph_edges
     return vertices, final_edges
 
-def is_connected(edges_list, num_vertices):
-    if num_vertices == 0: return True
-    if num_vertices == 1: return True
+def is_connected(edges_list,num_vertices):
+    if num_vertices<=1: return True;
     if not edges_list: return False
-
-    adj = [[] for _ in range(num_vertices)]
-    for u, v in edges_list:
-        adj[u].append(v)
-        adj[v].append(u)
-
-    start_node = 0
-    q = [start_node]
-    visited = {start_node}
-    count = 0
-    head = 0
-    while head < len(q):
-        u = q[head]; head += 1; count += 1
+    adj=[[] for _ in range(num_vertices)];
+    for u,v in edges_list: adj[u].append(v); adj[v].append(u)
+    q=[0]; visited={0}; count=0; head=0
+    while head<len(q):
+        u=q[head]; head+=1; count+=1
         for v_neighbor in adj[u]:
-            if v_neighbor not in visited:
-                visited.add(v_neighbor); q.append(v_neighbor)
+            if v_neighbor not in visited: visited.add(v_neighbor); q.append(v_neighbor)
     return count == num_vertices
 
-def draw_graph(screen_surface, graph_verts, graph_edges_list, vert_radius, crossing_edges_param=None):
-    if crossing_edges_param is None: crossing_edges_param = set()
-    for edge_tuple in graph_edges_list:
-        start_pos = graph_verts[edge_tuple[0]]; end_pos = graph_verts[edge_tuple[1]]
-        edge_color = RED_EDGE_CROSSING if edge_tuple in crossing_edges_param else GREEN_EDGE_NON_CROSSING
-        pygame.draw.line(screen_surface, edge_color, start_pos, end_pos, 2)
-    for vertex_pos in graph_verts:
-        pygame.draw.circle(screen_surface, RED_VERTEX, vertex_pos, vert_radius)
+def capture_game_view(screen_w, screen_h, bg_color, verts, edgs, cross_set, v_rad, v_clr, cross_clr, non_cross_clr, filename="planarity_screenshot.png"):
+    surf = pygame.Surface((screen_w, screen_h)); surf.fill(bg_color)
+    for e_idx, e_val in enumerate(edgs): # Corrected iteration
+        if not (0 <= e_val[0] < len(verts) and 0 <= e_val[1] < len(verts)): continue
+        sp, ep = verts[e_val[0]], verts[e_val[1]]
+        clr = cross_clr if e_val in cross_set else non_cross_clr
+        pygame.draw.line(surf, clr, sp, ep, 2)
+    for vp in verts: pygame.draw.circle(surf, v_clr, vp, v_rad)
+    try: pygame.image.save(surf,filename); print(f"Screenshot: {filename}"); return filename
+    except Exception as e: print(f"Screenshot error: {e}"); return None
+
+def draw_graph(screen_s, g_verts, g_edges, v_rad, cross_s=None):
+    if cross_s is None: cross_s=set()
+    for e_tpl in g_edges:
+        sp,ep=g_verts[e_tpl[0]],g_verts[e_tpl[1]]
+        e_clr = RED_EDGE_CROSSING if e_tpl in cross_s else GREEN_EDGE_NON_CROSSING
+        pygame.draw.line(screen_s,e_clr,sp,ep,2)
+    for vp in g_verts: pygame.draw.circle(screen_s,RED_VERTEX,vp,v_rad)
 
 def on_segment(p,q,r): return (q[0]<=max(p[0],r[0]) and q[0]>=min(p[0],r[0]) and q[1]<=max(p[1],r[1]) and q[1]>=min(p[1],r[1]))
 def orientation(p,q,r): val=(q[1]-p[1])*(r[0]-q[0])-(q[0]-p[0])*(r[1]-q[1]); return 0 if val==0 else (1 if val>0 else 2)
 def do_lines_intersect(p1,q1,p2,q2):
-    o1=orientation(p1,q1,p2); o2=orientation(p1,q1,q2); o3=orientation(p2,q2,p1); o4=orientation(p2,q2,q1)
+    o1,o2,o3,o4=orientation(p1,q1,p2),orientation(p1,q1,q2),orientation(p2,q2,p1),orientation(p2,q2,q1)
     if o1!=o2 and o3!=o4: return True
-    if o1==0 and on_segment(p1,p2,q1): return True;
-    if o2==0 and on_segment(p1,q2,q1): return True
-    if o3==0 and on_segment(p2,p1,q2): return True;
-    if o4==0 and on_segment(p2,q1,q2): return True
+    if o1==0 and on_segment(p1,p2,q1): return True; if o2==0 and on_segment(p1,q2,q1): return True
+    if o3==0 and on_segment(p2,p1,q2): return True; if o4==0 and on_segment(p2,q1,q2): return True
     return False
 
-def get_crossing_edges(graph_verts, graph_edges_list):
-    crossing_edges_set = set(); num_edges = len(graph_edges_list)
-    for i in range(num_edges):
-        for j in range(i + 1, num_edges):
-            e1_idx,e2_idx = graph_edges_list[i],graph_edges_list[j]
-            # Check if edges share a common vertex more directly
-            if e1_idx[0] == e2_idx[0] or e1_idx[0] == e2_idx[1] or \
-               e1_idx[1] == e2_idx[0] or e1_idx[1] == e2_idx[1]:
-                continue
-            p1,q1=graph_verts[e1_idx[0]],graph_verts[e1_idx[1]]
-            p2,q2=graph_verts[e2_idx[0]],graph_verts[e2_idx[1]]
-            if do_lines_intersect(p1,q1,p2,q2):
-                crossing_edges_set.add(e1_idx); crossing_edges_set.add(e2_idx)
-    return crossing_edges_set
+def get_crossing_edges(g_verts, g_edges):
+    cross_set=set(); n_edges=len(g_edges)
+    for i in range(n_edges):
+        for j in range(i+1,n_edges):
+            e1,e2=g_edges[i],g_edges[j]
+            if e1[0]==e2[0] or e1[0]==e2[1] or e1[1]==e2[0] or e1[1]==e2[1]: continue
+            p1,q1=g_verts[e1[0]],g_verts[e1[1]]; p2,q2=g_verts[e2[0]],g_verts[e2[1]]
+            if do_lines_intersect(p1,q1,p2,q2): cross_set.add(e1); cross_set.add(e2)
+    return cross_set
 
-def main_game_session(screen, common_win_font, common_stats_font, fixed_num_vertices=None):
-    if fixed_num_vertices is not None: num_vertices_this_session = fixed_num_vertices
-    else: num_vertices_this_session = get_num_vertices_from_user()
+def main_game_session(screen, win_fnt, stats_fnt, fixed_n_v=None):
+    n_v_sess = fixed_n_v if fixed_n_v is not None else get_num_vertices_from_user()
+    g_v, g_e = generate_random_planar_graph(n_v_sess)
+    sel_v_idx, m_down = None,False; cross_set = get_crossing_edges(g_v,g_e)
+    s_time, elap_s = pygame.time.get_ticks(),0.0; g_won,paused,p_s_ticks = False,False,0
+    scr_msg_until, scr_msg_surf = 0,None
 
-    graph_vertices, graph_edges = generate_random_planar_graph(num_vertices_this_session)
-    selected_vertex_index = None; mouse_button_down = False
-    crossing_edges_set = get_crossing_edges(graph_vertices, graph_edges)
-    start_time = pygame.time.get_ticks(); elapsed_time_seconds = 0.0
-    game_won = False; is_paused = False; pause_start_ticks = 0
+    r_btn_r,rs_btn_r,px_btn_r,cap_btn_r,pr_btn_r,pq_btn_r,res_btn_r = [None]*7
+    pause_btn_r = pygame.Rect(10,10,85,30)
 
-    retry_button_rect, retry_same_button_rect, post_to_x_button_rect = None, None, None
-    pause_reset_button_rect, pause_quit_button_rect, resume_button_rect = None, None, None
-    pause_button_rect = pygame.Rect(10, 10, 85, 30)
+    ng_txt,rs_txt,px_txt,cap_txt = (stats_fnt.render(t,True,BLACK) if stats_fnt else None for t in ["New Game","Retry Same Level","Post to X","Capture View"])
+    paused_title,resume_txt,reset_txt,quit_txt = (win_fnt.render("Paused",True,BLACK) if win_fnt else None), \
+                                                 (stats_fnt.render(t,True,BLACK) if stats_fnt else None for t in ["Resume","Reset Level","Quit to Menu"])
+    trans_p_btn_surf = None
+    if stats_fnt:
+        p_txt_rnd = stats_fnt.render("Pause",True,BLACK)
+        if p_txt_rnd:
+            trans_p_btn_surf=pygame.Surface(pause_btn_r.size,pygame.SRCALPHA);trans_p_btn_surf.fill((220,220,220,180))
+            trans_p_btn_surf.blit(p_txt_rnd,p_txt_rnd.get_rect(center=(pause_btn_r.width//2,pause_btn_r.height//2)))
+            pygame.draw.rect(trans_p_btn_surf,BLACK,trans_p_btn_surf.get_rect(),1)
 
-    new_game_text = common_stats_font.render("New Game", True, BLACK) if common_stats_font else None
-    retry_same_text = common_stats_font.render("Retry Same Level", True, BLACK) if common_stats_font else None
-    post_to_x_text = common_stats_font.render("Post to X", True, BLACK) if common_stats_font else None
-    paused_title_text = common_win_font.render("Paused", True, BLACK) if common_win_font else None
-    resume_text = common_stats_font.render("Resume", True, BLACK) if common_stats_font else None
-    reset_level_text = common_stats_font.render("Reset Level", True, BLACK) if common_stats_font else None
-    quit_to_menu_text = common_stats_font.render("Quit to Menu", True, BLACK) if common_stats_font else None
+    run_sess = True
+    while run_sess:
+        c_ticks=pygame.time.get_ticks()
+        if not g_won and not paused: elap_s=(c_ticks-s_time)/1000.0
+        for ev in pygame.event.get():
+            if ev.type==pygame.QUIT: return "QUIT",None
+            if ev.type==pygame.MOUSEBUTTONDOWN:
+                if ev.button==1: # LEFT CLICK - Vertex interaction
+                    if not g_won and not paused:
+                        m_down=True; mx,my=ev.pos
+                        for i,(vx,vy) in enumerate(g_v):
+                            if ((vx-mx)**2+(vy-my)**2)**0.5 < VERTEX_RADIUS: sel_v_idx=i;break
+                elif ev.button==3: # RIGHT CLICK - UI Buttons
+                    if not paused and not g_won and pause_btn_r.collidepoint(ev.pos): is_paused=True;p_s_ticks=c_ticks
+                    elif paused:
+                        if res_btn_r and res_btn_r.collidepoint(ev.pos): is_paused=False;s_time+=c_ticks-p_s_ticks
+                        elif pr_btn_r and pr_btn_r.collidepoint(ev.pos): return "RESTART_SAME",n_v_sess
+                        elif pq_btn_r and pq_btn_r.collidepoint(ev.pos): return "RESTART",None
+                    elif g_won:
+                        if r_btn_r and r_btn_r.collidepoint(ev.pos): return "RESTART",None
+                        elif rs_btn_r and rs_btn_r.collidepoint(ev.pos): return "RESTART_SAME",n_v_sess
+                        elif cap_btn_r and cap_btn_r.collidepoint(ev.pos):
+                            sf=capture_game_view(SCREEN_WIDTH,SCREEN_HEIGHT,WHITE,g_v,g_e,cross_set,VERTEX_RADIUS,RED_VERTEX,RED_EDGE_CROSSING,GREEN_EDGE_NON_CROSSING)
+                            if sf and stats_fnt: scr_msg_surf=stats_fnt.render(f"Saved: {sf}",True,BLACK); scr_msg_until=c_ticks+3000
+                        elif px_btn_r and px_btn_r.collidepoint(ev.pos):
+                            capture_game_view(SCREEN_WIDTH,SCREEN_HEIGHT,WHITE,g_v,g_e,cross_set,VERTEX_RADIUS,RED_VERTEX,RED_EDGE_CROSSING,GREEN_EDGE_NON_CROSSING)
+                            tw=f"Solved Planarity: {n_v_sess}V, {len(g_e)}E, {elap_s:.1f}s! #PlanarityGame"; webbrowser.open_new_tab(f"https://x.com/intent/post?text={urllib.parse.quote(tw)}")
+            elif ev.type==pygame.MOUSEBUTTONUP and ev.button==1:
+                m_down=False
+                if not g_won and not paused and sel_v_idx is not None: cross_set=get_crossing_edges(g_v,g_e)
+                sel_v_idx=None
+            elif ev.type==pygame.MOUSEMOTION:
+                if not g_won and not paused and m_down and sel_v_idx is not None:
+                    mx,my=ev.pos;g_v[sel_v_idx]=(max(VERTEX_RADIUS,min(mx,SCREEN_WIDTH-VERTEX_RADIUS)),max(VERTEX_RADIUS,min(my,SCREEN_HEIGHT-VERTEX_RADIUS)))
+                    cross_set=get_crossing_edges(g_v,g_e)
 
-    transparent_pause_button_surface = None
-    if common_stats_font:
-        game_pause_text_render = common_stats_font.render("Pause", True, BLACK)
-        if game_pause_text_render:
-            transparent_pause_button_surface = pygame.Surface(pause_button_rect.size, pygame.SRCALPHA)
-            transparent_pause_button_surface.fill((220, 220, 220, 180))
-            text_r = game_pause_text_render.get_rect(center=(pause_button_rect.width//2, pause_button_rect.height//2))
-            transparent_pause_button_surface.blit(game_pause_text_render, text_r)
-            pygame.draw.rect(transparent_pause_button_surface, BLACK, transparent_pause_button_surface.get_rect(), 1)
+        screen.fill(WHITE); draw_graph(screen,g_v,g_e,VERTEX_RADIUS,cross_set)
+        if not g_won and not paused and not cross_set:
+            g_won=True
+            if g_won and not r_btn_r: # Define win screen button rects once
+                bw,bh,bs=220,40,10 # Button width, height, spacing
+                widths = [w.get_width()+30 if w else 200 for w in [ng_txt,rs_txt,px_txt,cap_txt]]
+                max_bw = max(widths) if widths else bw
+                r_btn_r,rs_btn_r,px_btn_r,cap_btn_r = (pygame.Rect(0,0,max_bw,bh) for _ in range(4))
 
-    running_session = True
-    while running_session:
-        current_ticks = pygame.time.get_ticks()
-        if not game_won and not is_paused: elapsed_time_seconds = (current_ticks - start_time) / 1000.0
+        if g_won:
+            h_title=win_fnt.get_height() if win_fnt else 60; h_stat=stats_fnt.get_height() if stats_fnt else 30
+            h_btn=40; s_title,s_stat,s_btn_block,s_btn = 10,3,20,8
+            msgs_s=[win_fnt.render("You Win!",True,WIN_MESSAGE_COLOR) if win_fnt else None]
+            stats_data=[f"Vertices: {n_v_sess}",f"Edges: {len(g_e)}",f"Time: {elap_s:.1f}s"]
+            if stats_fnt: msgs_s.extend([stats_fnt.render(s,True,WIN_MESSAGE_COLOR) for s in stats_data])
+            msgs_s = [s for s in msgs_s if s] # Filter out None if fonts failed
 
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT: return "QUIT", None
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1: # Left click
-                    if game_won:
-                        if retry_button_rect and retry_button_rect.collidepoint(event.pos): return "RESTART", None
-                        elif retry_same_button_rect and retry_same_button_rect.collidepoint(event.pos): return "RESTART_SAME", num_vertices_this_session
-                        elif post_to_x_button_rect and post_to_x_button_rect.collidepoint(event.pos):
-                            tweet = f"I solved a Planarity puzzle with {num_vertices_this_session}V & {len(graph_edges)}E in {elapsed_time_seconds:.1f}s! #PlanarityGame"
-                            webbrowser.open_new_tab(f"https://x.com/intent/post?text={urllib.parse.quote(tweet)}")
-                    elif is_paused:
-                        if resume_button_rect and resume_button_rect.collidepoint(event.pos):
-                            is_paused = False; start_time += current_ticks - pause_start_ticks
-                        elif pause_reset_button_rect and pause_reset_button_rect.collidepoint(event.pos): return "RESTART_SAME", num_vertices_this_session
-                        elif pause_quit_button_rect and pause_quit_button_rect.collidepoint(event.pos): return "RESTART", None
-                    elif not game_won: # Active gameplay
-                        mouse_button_down = True; mouse_x, mouse_y = event.pos
-                        for i,(vx,vy) in enumerate(graph_vertices):
-                            if ((vx-mouse_x)**2+(vy-mouse_y)**2)**0.5 < VERTEX_RADIUS: selected_vertex_index=i; break
-                elif event.button == 3: # Right click
-                    if not is_paused and not game_won and pause_button_rect.collidepoint(event.pos):
-                        is_paused = True; pause_start_ticks = current_ticks
-            elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-                mouse_button_down = False
-                if not game_won and not is_paused and selected_vertex_index is not None:
-                    crossing_edges_set = get_crossing_edges(graph_vertices, graph_edges)
-                selected_vertex_index = None
-            elif event.type == pygame.MOUSEMOTION:
-                if not game_won and not is_paused and mouse_button_down and selected_vertex_index is not None:
-                    mx,my=event.pos; graph_vertices[selected_vertex_index]=(max(VERTEX_RADIUS,min(mx,SCREEN_WIDTH-VERTEX_RADIUS)),max(VERTEX_RADIUS,min(my,SCREEN_HEIGHT-VERTEX_RADIUS)))
-                    crossing_edges_set = get_crossing_edges(graph_vertices, graph_edges)
+            btns_d = []
+            if ng_txt: btns_d.append({'s':ng_txt,'r':r_btn_r,'c':(200,200,200)})
+            if rs_txt: btns_d.append({'s':rs_txt,'r':rs_btn_r,'c':(200,200,200)})
+            if cap_txt: btns_d.append({'s':cap_txt,'r':cap_btn_r,'c':(200,200,180)}) # Yellowish for capture
+            if px_txt: btns_d.append({'s':px_txt,'r':px_btn_r,'c':(180,180,220)}) # Bluish for X
 
-        screen.fill(WHITE); draw_graph(screen, graph_vertices, graph_edges, VERTEX_RADIUS, crossing_edges_set)
+            total_h = (h_title + s_title if msgs_s and msgs_s[0] else 0) + \
+                      (sum(s.get_height() for s in msgs_s[1:]) + max(0,len(msgs_s)-2)*s_stat if len(msgs_s)>1 else 0) + \
+                      (s_btn_block if btns_d else 0) + \
+                      (len(btns_d)*h_btn + max(0,len(btns_d)-1)*s_btn if btns_d else 0)
+            curr_y = SCREEN_HEIGHT//2 - total_h//2
 
-        if not game_won and not is_paused and not crossing_edges_set:
-            game_won = True
-            # Define win screen button rects ONCE when game is won. Positions will be set in drawing.
-            # Widths are based on pre-rendered text, heights are standard.
-            btn_std_h = 40; btn_std_s = 10
-            w_ng = new_game_text.get_width() + 30 if new_game_text else 200
-            w_rs = retry_same_text.get_width() + 30 if retry_same_text else 200
-            w_px = post_to_x_text.get_width() + 30 if post_to_x_text else 200
+            if msgs_s:
+                r=msgs_s[0].get_rect(center=(SCREEN_WIDTH//2,curr_y+msgs_s[0].get_height()//2));screen.blit(msgs_s[0],r);curr_y+=msgs_s[0].get_height()+s_title
+                for i in range(1,len(msgs_s)):
+                    s=msgs_s[i];r=s.get_rect(center=(SCREEN_WIDTH//2,curr_y+s.get_height()//2));screen.blit(s,r);curr_y+=s.get_height()+s_stat
+            curr_y += s_btn_block - (s_stat if len(msgs_s)>1 else 0) # Adjust if no stats, or remove last stat spacing
 
-            retry_button_rect = pygame.Rect(0, 0, w_ng, btn_std_h)
-            retry_same_button_rect = pygame.Rect(0, 0, w_rs, btn_std_h)
-            post_to_x_button_rect = pygame.Rect(0, 0, w_px, btn_std_h)
+            for b in btns_d:
+                b['r'].centerx=SCREEN_WIDTH//2;b['r'].top=curr_y;pygame.draw.rect(screen,b['c'],b['r']);pygame.draw.rect(screen,BLACK,b['r'],2)
+                screen.blit(b['s'],b['s'].get_rect(center=b['r'].center));curr_y+=h_btn+s_btn
 
+        if not g_won and not paused and stats_fnt:
+            screen.blit(stats_fnt.render(f"Time: {elap_s:.1f}",True,BLACK),(10,50))
+            if trans_p_btn_surf: screen.blit(trans_p_btn_surf,pause_btn_r.topleft)
 
-        if game_won:
-            # --- Layout Constants for Win Screen ---
-            TITLE_FONT_HEIGHT = common_win_font.get_height() if common_win_font else 60
-            STATS_FONT_HEIGHT = common_stats_font.get_height() if common_stats_font else 30
-            BUTTON_HEIGHT = 40
-            SPACE_AFTER_TITLE = 15
-            SPACE_AFTER_STAT_LINE = 5
-            SPACE_BEFORE_BUTTONS = 25
-            SPACE_BETWEEN_BUTTONS = 10
+        if scr_msg_until > 0 and stats_fnt:
+            if c_ticks < scr_msg_until:
+                if scr_msg_surf:pygame.draw.rect(screen,(230,230,230),scr_msg_surf.get_rect(center=(SCREEN_WIDTH//2,SCREEN_HEIGHT-30)).inflate(10,5));screen.blit(scr_msg_surf,scr_msg_surf.get_rect(center=(SCREEN_WIDTH//2,SCREEN_HEIGHT-30)))
+            else: scr_msg_until=0; scr_msg_surf=None
 
-            # Prepare rendered surfaces for messages
-            win_msg_surfaces = []
-            if common_win_font: win_msg_surfaces.append(common_win_font.render("You Win!", True, WIN_MESSAGE_COLOR))
-            stats_to_display = [
-                f"Vertices: {num_vertices_this_session}",
-                f"Edges: {len(graph_edges)}",
-                f"Time: {elapsed_time_seconds:.1f} seconds"
-            ]
-            if common_stats_font:
-                for stat_text in stats_to_display:
-                    win_msg_surfaces.append(common_stats_font.render(stat_text, True, WIN_MESSAGE_COLOR))
+        if paused:
+            ovl=pygame.Surface((SCREEN_WIDTH,SCREEN_HEIGHT),pygame.SRCALPHA);ovl.fill((0,0,0,180));screen.blit(ovl,(0,0))
+            y_s=SCREEN_HEIGHT//2-100;bw,bh,s=180,50,15
+            if paused_title:screen.blit(paused_title,paused_title.get_rect(center=(SCREEN_WIDTH//2,y_s)));y_s+=60
+            btns_p_d = [{'s':resume_txt,'r':resume_button_rect},{'s':reset_level_text,'r':pr_btn_r},{'s':quit_to_menu_text,'r':pq_btn_r}]
+            for i,b_d in enumerate(btns_p_d):
+                if b_d['s']: # Check if text surface exists
+                    # Dynamically assign rect to the button's dict or use pre-initialized ones if their scope allows
+                    # For pause menu, rects are defined here for simplicity as they are only used here.
+                    current_btn_rect = pygame.Rect(SCREEN_WIDTH//2-bw//2,y_s + i*(bh+s),bw,bh)
+                    if i==0: resume_button_rect = current_btn_rect # Assign for click detection
+                    elif i==1: pause_reset_button_rect = current_btn_rect
+                    elif i==2: pause_quit_button_rect = current_btn_rect
 
-            # Prepare button data
-            buttons_data = []
-            if new_game_text: buttons_data.append({'surface': new_game_text, 'rect': retry_button_rect, 'color': (200,200,200)})
-            if retry_same_text: buttons_data.append({'surface': retry_same_text, 'rect': retry_same_button_rect, 'color': (200,200,200)})
-            if post_to_x_text: buttons_data.append({'surface': post_to_x_text, 'rect': post_to_x_button_rect, 'color': (180,180,220)})
-
-            # Calculate total height
-            total_content_h = 0
-            if win_msg_surfaces:
-                total_content_h += TITLE_FONT_HEIGHT + SPACE_AFTER_TITLE
-                total_content_h += (len(stats_to_display) * STATS_FONT_HEIGHT) + (max(0, len(stats_to_display)-1) * SPACE_AFTER_STAT_LINE)
-            if buttons_data:
-                total_content_h += SPACE_BEFORE_BUTTONS
-                total_content_h += len(buttons_data) * BUTTON_HEIGHT
-                total_content_h += max(0, len(buttons_data)-1) * SPACE_BETWEEN_BUTTONS
-
-            current_y_top = SCREEN_HEIGHT // 2 - total_content_h // 2
-
-            # Render messages
-            if win_msg_surfaces:
-                title_surf = win_msg_surfaces[0]
-                title_r = title_surf.get_rect(center=(SCREEN_WIDTH//2, current_y_top + title_surf.get_height()//2))
-                screen.blit(title_surf, title_r)
-                current_y_top += title_surf.get_height() + SPACE_AFTER_TITLE
-
-                for i in range(1, len(win_msg_surfaces)):
-                    stat_surf = win_msg_surfaces[i]
-                    stat_r = stat_surf.get_rect(center=(SCREEN_WIDTH//2, current_y_top + stat_surf.get_height()//2))
-                    screen.blit(stat_surf, stat_r)
-                    current_y_top += stat_surf.get_height() + SPACE_AFTER_STAT_LINE
-
-            current_y_top += SPACE_BEFORE_BUTTONS - SPACE_AFTER_STAT_LINE # Adjust as last stat_line added extra space
-
-            # Render buttons
-            for btn in buttons_data:
-                btn['rect'].centerx = SCREEN_WIDTH // 2
-                btn['rect'].top = current_y_top
-                pygame.draw.rect(screen, btn['color'], btn['rect'])
-                pygame.draw.rect(screen, BLACK, btn['rect'], 2)
-                screen.blit(btn['surface'], btn['surface'].get_rect(center=btn['rect'].center))
-                current_y_top += BUTTON_HEIGHT + SPACE_BETWEEN_BUTTONS
-
-        if not game_won and not is_paused and common_stats_font:
-            screen.blit(common_stats_font.render(f"Time: {elapsed_time_seconds:.1f}",True,BLACK),(10,50))
-            if transparent_pause_button_surface: screen.blit(transparent_pause_button_surface,pause_button_rect.topleft)
-
-        if is_paused:
-            ovl=pygame.Surface((SCREEN_WIDTH,SCREEN_HEIGHT),pygame.SRCALPHA); ovl.fill((0,0,0,180)); screen.blit(ovl,(0,0))
-            y_start=SCREEN_HEIGHT//2-100 # Adjusted for potentially 3 buttons + title
-            btn_w,btn_h,btn_s = 180,50,15
-            if paused_title_text: screen.blit(paused_title_text,paused_title_text.get_rect(center=(SCREEN_WIDTH//2,y_start))); y_start+=60
-
-            # Resume Button
-            if resume_text:
-                resume_button_rect=pygame.Rect(SCREEN_WIDTH//2-btn_w//2,y_start,btn_w,btn_h); pygame.draw.rect(screen,(200,200,200),resume_button_rect); pygame.draw.rect(screen,BLACK,resume_button_rect,2)
-                screen.blit(resume_text,resume_text.get_rect(center=resume_button_rect.center)); y_start+=btn_h+btn_s
-            # Reset Level Button
-            if reset_level_text:
-                pause_reset_button_rect=pygame.Rect(SCREEN_WIDTH//2-btn_w//2,y_start,btn_w,btn_h); pygame.draw.rect(screen,(200,200,200),pause_reset_button_rect); pygame.draw.rect(screen,BLACK,pause_reset_button_rect,2)
-                screen.blit(reset_level_text,reset_level_text.get_rect(center=pause_reset_button_rect.center)); y_start+=btn_h+btn_s
-            # Quit to Menu Button
-            if quit_to_menu_text:
-                pause_quit_button_rect=pygame.Rect(SCREEN_WIDTH//2-btn_w//2,y_start,btn_w,btn_h); pygame.draw.rect(screen,(200,200,200),pause_quit_button_rect); pygame.draw.rect(screen,BLACK,pause_quit_button_rect,2)
-                screen.blit(quit_to_menu_text,quit_to_menu_text.get_rect(center=pause_quit_button_rect.center))
+                    pygame.draw.rect(screen,(200,200,200),current_btn_rect);pygame.draw.rect(screen,BLACK,current_btn_rect,2)
+                    screen.blit(b_d['s'],b_d['s'].get_rect(center=current_btn_rect.center))
         pygame.display.flip()
     return "QUIT", None
 
@@ -364,12 +268,12 @@ def main_application():
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption("Planarity")
-    win_font, stats_font = None, None
-    try: win_font = pygame.font.Font(None, 74); stats_font = pygame.font.Font(None, 36)
+    win_fnt, stats_fnt = None, None
+    try: win_fnt = pygame.font.Font(None, 74); stats_fnt = pygame.font.Font(None, 36)
     except Exception as e: print(f"Font loading failed: {e}")
     fixed_n = None
     while True:
-        status, data = main_game_session(screen, win_font, stats_font, fixed_num_vertices=fixed_n)
+        status, data = main_game_session(screen, win_fnt, stats_fnt, fixed_num_vertices=fixed_n)
         if status == "QUIT": break
         elif status == "RESTART": fixed_n = None
         elif status == "RESTART_SAME": fixed_n = data
