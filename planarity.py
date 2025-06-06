@@ -288,7 +288,7 @@ def main_application():
     except Exception as e: print(f"Font loading failed: {e}")
     fixed_n = None
     while True:
-        status, data = main_game_session(screen, win_fnt, stats_fnt, fixed_num_vertices=fixed_n)
+        status, data = main_game_session(screen, win_fnt, stats_fnt, fixed_n_v=fixed_n) # Corrected keyword
         if status == "QUIT": break
         elif status == "RESTART": fixed_n = None
         elif status == "RESTART_SAME": fixed_n = data
