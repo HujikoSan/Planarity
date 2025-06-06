@@ -332,69 +332,177 @@ def get_crossing_edges(graph_verts, graph_edges_list):
 
     return crossing_edges_set
 
-# --- Main Game Function ---
-def main_game():
-    # --- Get user input for number of vertices ---
-    # This should happen before pygame.init() if input is via console without a Pygame window active.
-    # However, input() will work fine here before the main loop starts.
-    num_vertices = get_num_vertices_from_user()
-
-    pygame.init()
-
-    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-    pygame.display.set_caption("Planarity")
-
-    win_font = None
-    try:
-        win_font = pygame.font.Font(None, 74)
-    except Exception as e:
-        print(f"Font loading failed in main_game: {e}")
-
+# --- Main Game Session Function ---
+def main_game_session(screen, num_vertices, common_win_font, common_stats_font):
     graph_vertices, graph_edges = generate_random_planar_graph(num_vertices)
 
     selected_vertex_index = None
     mouse_button_down = False
     crossing_edges_set = get_crossing_edges(graph_vertices, graph_edges)
 
-    running = True
-    while running:
+    start_time = pygame.time.get_ticks()
+    elapsed_time_seconds = 0.0
+    game_won = False
+    is_paused = False
+    pause_start_ticks = 0
+
+    # Button Rects - will be defined dynamically when needed
+    retry_button_rect = None
+    pause_reset_button_rect = None
+    pause_quit_button_rect = None
+
+    # Pre-render static text surfaces if fonts are available
+    retry_button_text_surface = common_stats_font.render("Retry", True, BLACK) if common_stats_font else None
+    paused_text_surface = common_win_font.render("Paused", True, BLACK) if common_win_font else None
+    pause_reset_text_surface = common_stats_font.render("Reset", True, BLACK) if common_stats_font else None
+    pause_quit_text_surface = common_stats_font.render("Quit", True, BLACK) if common_stats_font else None
+
+    running_session = True
+    while running_session:
+        current_ticks = pygame.time.get_ticks()
+
+        if not game_won and not is_paused:
+            elapsed_time_seconds = (current_ticks - start_time) / 1000.0
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                running = False
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:
-                    mouse_button_down = True
-                    mouse_x, mouse_y = event.pos
-                    for i, (vx, vy) in enumerate(graph_vertices):
-                        if ((vx - mouse_x)**2 + (vy - mouse_y)**2)**0.5 < VERTEX_RADIUS:
-                            selected_vertex_index = i
-                            break
+                return "QUIT"
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_p:
+                    is_paused = not is_paused
+                    if is_paused:
+                        pause_start_ticks = current_ticks
+                    else: # Resuming
+                        pause_duration = current_ticks - pause_start_ticks
+                        start_time += pause_duration
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1: # Left click
+                    if game_won and retry_button_rect and retry_button_rect.collidepoint(event.pos):
+                        return "RESTART"
+
+                    if is_paused:
+                        if pause_reset_button_rect and pause_reset_button_rect.collidepoint(event.pos):
+                            return "RESTART"
+                        if pause_quit_button_rect and pause_quit_button_rect.collidepoint(event.pos):
+                            return "QUIT"
+                    elif not game_won: # Only process game clicks if not paused and not won
+                        mouse_button_down = True
+                        mouse_x, mouse_y = event.pos
+                        for i, (vx, vy) in enumerate(graph_vertices):
+                            if ((vx - mouse_x)**2 + (vy - mouse_y)**2)**0.5 < VERTEX_RADIUS:
+                                selected_vertex_index = i
+                                break
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 1:
-                    mouse_button_down = False
-                    if selected_vertex_index is not None:
-                        crossing_edges_set = get_crossing_edges(graph_vertices, graph_edges) # Update set
+                    mouse_button_down = False # Always release mouse button
+                    if not game_won and not is_paused and selected_vertex_index is not None:
+                        crossing_edges_set = get_crossing_edges(graph_vertices, graph_edges)
+                    # Deselect regardless of pause/win state if mouse is up
                     selected_vertex_index = None
             elif event.type == pygame.MOUSEMOTION:
-                if mouse_button_down and selected_vertex_index is not None:
+                if not game_won and not is_paused and mouse_button_down and selected_vertex_index is not None:
                     mouse_x, mouse_y = event.pos
                     clamped_x = max(VERTEX_RADIUS, min(mouse_x, SCREEN_WIDTH - VERTEX_RADIUS))
                     clamped_y = max(VERTEX_RADIUS, min(mouse_y, SCREEN_HEIGHT - VERTEX_RADIUS))
                     graph_vertices[selected_vertex_index] = (clamped_x, clamped_y)
-                    crossing_edges_set = get_crossing_edges(graph_vertices, graph_edges) # Update set
+                    crossing_edges_set = get_crossing_edges(graph_vertices, graph_edges)
 
         screen.fill(WHITE)
-        # Pass the set of crossing edges to draw_graph
         draw_graph(screen, graph_vertices, graph_edges, VERTEX_RADIUS, crossing_edges_set)
 
-        if not crossing_edges_set and win_font: # Check if the set is empty
-            win_text_surface = win_font.render("You Win!", True, WIN_MESSAGE_COLOR)
-            text_rect = win_text_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
-            screen.blit(win_text_surface, text_rect)
+        if not game_won and not is_paused and not crossing_edges_set: # Game just won
+            game_won = True
+            # Define retry button properties here, once game is won
+            if retry_button_text_surface:
+                button_width = retry_button_text_surface.get_width() + 40
+                button_height = retry_button_text_surface.get_height() + 20
+                button_y = SCREEN_HEIGHT // 2 + 2*45 + 30
+                retry_button_rect = pygame.Rect(SCREEN_WIDTH // 2 - button_width // 2, button_y, button_width, button_height)
+
+        if game_won: # Display Win Message, Stats, and Retry Button
+            win_messages = [
+                "You Win!",
+                f"Vertices: {len(graph_vertices)}",
+                f"Edges: {len(graph_edges)}",
+                f"Time: {elapsed_time_seconds:.1f} seconds"
+            ]
+            current_y = SCREEN_HEIGHT // 2 - (len(win_messages) * 40 + (retry_button_text_surface.get_height() + 20 if retry_button_text_surface else 0)) // 2
+
+            for i, msg in enumerate(win_messages):
+                font_to_use = common_win_font if i == 0 else common_stats_font
+                if not font_to_use: continue
+                text_surface = font_to_use.render(msg, True, WIN_MESSAGE_COLOR)
+                text_rect = text_surface.get_rect(center=(SCREEN_WIDTH // 2, current_y))
+                screen.blit(text_surface, text_rect)
+                current_y += 45
+
+            if retry_button_rect and retry_button_text_surface: # retry_button_rect is defined when game_won becomes true
+                pygame.draw.rect(screen, (200, 200, 200), retry_button_rect)
+                pygame.draw.rect(screen, BLACK, retry_button_rect, 2)
+                text_rect = retry_button_text_surface.get_rect(center=retry_button_rect.center)
+                screen.blit(retry_button_text_surface, text_rect)
+
+        if not game_won and not is_paused and common_stats_font: # Live timer
+            timer_surface = common_stats_font.render(f"Time: {elapsed_time_seconds:.1f}", True, BLACK)
+            screen.blit(timer_surface, (10, 10))
+
+        if is_paused:
+            overlay_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            overlay_surface.fill((0, 0, 0, 180)) # Semi-transparent black
+            screen.blit(overlay_surface, (0,0))
+
+            if paused_text_surface:
+                paused_rect = paused_text_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 60))
+                screen.blit(paused_text_surface, paused_rect)
+
+            button_width_pause = 150
+            button_height_pause = 50
+
+            # Reset button
+            if pause_reset_text_surface:
+                pause_reset_button_rect = pygame.Rect(SCREEN_WIDTH // 2 - button_width_pause // 2, SCREEN_HEIGHT // 2, button_width_pause, button_height_pause)
+                pygame.draw.rect(screen, (200,200,200), pause_reset_button_rect)
+                pygame.draw.rect(screen, BLACK, pause_reset_button_rect, 2)
+                reset_text_rect = pause_reset_text_surface.get_rect(center=pause_reset_button_rect.center)
+                screen.blit(pause_reset_text_surface, reset_text_rect)
+
+            # Quit button
+            if pause_quit_text_surface:
+                pause_quit_button_rect = pygame.Rect(SCREEN_WIDTH // 2 - button_width_pause // 2, SCREEN_HEIGHT // 2 + 70, button_width_pause, button_height_pause)
+                pygame.draw.rect(screen, (200,200,200), pause_quit_button_rect)
+                pygame.draw.rect(screen, BLACK, pause_quit_button_rect, 2)
+                quit_text_rect = pause_quit_text_surface.get_rect(center=pause_quit_button_rect.center)
+                screen.blit(pause_quit_text_surface, quit_text_rect)
 
         pygame.display.flip()
 
+    return "QUIT" # Default action if loop exits unexpectedly
+
+
+# --- Main Application Runner ---
+def main_application():
+    pygame.init()
+    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+    pygame.display.set_caption("Planarity")
+
+    win_font, stats_font = None, None
+    try:
+        win_font = pygame.font.Font(None, 74)
+        stats_font = pygame.font.Font(None, 36)
+    except Exception as e:
+        print(f"Font loading failed: {e}")
+        # Game can still run without fonts, just won't display text
+
+    while True:
+        num_vertices = get_num_vertices_from_user()
+        action = main_game_session(screen, num_vertices, win_font, stats_font)
+        if action == "QUIT":
+            break
+
     pygame.quit()
 
+
 if __name__ == '__main__':
-    main_game()
+    main_application()
