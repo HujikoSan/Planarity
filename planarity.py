@@ -165,9 +165,21 @@ def main_game_session(screen, win_fnt, stats_fnt, fixed_n_v=None):
     r_btn_r,rs_btn_r,px_btn_r,cap_btn_r,pr_btn_r,pq_btn_r,res_btn_r = [None]*7
     pause_btn_r = pygame.Rect(10,10,85,30)
 
-    ng_txt,rs_txt,px_txt,cap_txt = (stats_fnt.render(t,True,BLACK) if stats_fnt else None for t in ["New Game","Retry Same Level","Post to X","Capture View"])
-    paused_title,resume_txt,reset_txt,quit_txt = (win_fnt.render("Paused",True,BLACK) if win_fnt else None), \
-                                                 (stats_fnt.render(t,True,BLACK) if stats_fnt else None for t in ["Resume","Reset Level","Quit to Menu"])
+    # Pre-render text surfaces
+    ng_txt = stats_fnt.render("New Game", True, BLACK) if stats_fnt else None
+    rs_txt = stats_fnt.render("Retry Same Level", True, BLACK) if stats_fnt else None
+    px_txt = stats_fnt.render("Post to X", True, BLACK) if stats_fnt else None
+    cap_txt = stats_fnt.render("Capture View", True, BLACK) if stats_fnt else None
+
+    paused_title = win_fnt.render("Paused", True, BLACK) if win_fnt else None
+
+    pause_button_labels = ["Resume", "Reset Level", "Quit to Menu"]
+    pause_button_surfaces = [stats_fnt.render(text, True, BLACK) if stats_fnt else None for text in pause_button_labels]
+
+    resume_txt = pause_button_surfaces[0]
+    reset_txt = pause_button_surfaces[1] # Corresponds to "Reset Level"
+    quit_txt = pause_button_surfaces[2]  # Corresponds to "Quit to Menu"
+
     trans_p_btn_surf = None
     if stats_fnt:
         p_txt_rnd = stats_fnt.render("Pause",True,BLACK)
