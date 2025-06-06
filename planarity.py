@@ -351,11 +351,20 @@ def main_game_session(screen, num_vertices, common_win_font, common_stats_font):
     pause_reset_button_rect = None
     pause_quit_button_rect = None
 
+    # Pause button in top-left for active gameplay
+    pause_button_rect = pygame.Rect(10, 10, 85, 30) # x, y, width, height
+
     # Pre-render static text surfaces if fonts are available
     retry_button_text_surface = common_stats_font.render("Retry", True, BLACK) if common_stats_font else None
+    # Pause screen texts
     paused_text_surface = common_win_font.render("Paused", True, BLACK) if common_win_font else None
+    # Pause screen menu buttons text
+    resume_text_surface = common_stats_font.render("Resume", True, BLACK) if common_stats_font else None
     pause_reset_text_surface = common_stats_font.render("Reset", True, BLACK) if common_stats_font else None
     pause_quit_text_surface = common_stats_font.render("Quit", True, BLACK) if common_stats_font else None
+    # Active gameplay pause button text
+    game_pause_button_text_surface = common_stats_font.render("Pause", True, BLACK) if common_stats_font else None
+
 
     running_session = True
     while running_session:
@@ -368,32 +377,40 @@ def main_game_session(screen, num_vertices, common_win_font, common_stats_font):
             if event.type == pygame.QUIT:
                 return "QUIT"
 
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_p:
-                    is_paused = not is_paused
-                    if is_paused:
-                        pause_start_ticks = current_ticks
-                    else: # Resuming
-                        pause_duration = current_ticks - pause_start_ticks
-                        start_time += pause_duration
+            # if event.type == pygame.KEYDOWN: # K_p pause toggle removed
+                # if event.key == pygame.K_p:
+                #     is_paused = not is_paused
+                #     if is_paused:
+                #         pause_start_ticks = current_ticks
+                #     else: # Resuming
+                #         pause_duration = current_ticks - pause_start_ticks
+                #         start_time += pause_duration
 
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1: # Left click
                     if game_won and retry_button_rect and retry_button_rect.collidepoint(event.pos):
                         return "RESTART"
 
-                    if is_paused:
-                        if pause_reset_button_rect and pause_reset_button_rect.collidepoint(event.pos):
+                    if is_paused: # Pause screen buttons (Resume, Reset, Quit)
+                        if resume_button_rect and resume_button_rect.collidepoint(event.pos):
+                            is_paused = False
+                            pause_duration = current_ticks - pause_start_ticks # current_ticks from loop start
+                            start_time += pause_duration
+                        elif pause_reset_button_rect and pause_reset_button_rect.collidepoint(event.pos):
                             return "RESTART"
-                        if pause_quit_button_rect and pause_quit_button_rect.collidepoint(event.pos):
+                        elif pause_quit_button_rect and pause_quit_button_rect.collidepoint(event.pos):
                             return "QUIT"
-                    elif not game_won: # Only process game clicks if not paused and not won
+                    elif not game_won: # Active gameplay vertex selection
                         mouse_button_down = True
                         mouse_x, mouse_y = event.pos
                         for i, (vx, vy) in enumerate(graph_vertices):
                             if ((vx - mouse_x)**2 + (vy - mouse_y)**2)**0.5 < VERTEX_RADIUS:
                                 selected_vertex_index = i
                                 break
+                elif event.button == 3: # Right mouse button
+                    if not is_paused and not game_won and pause_button_rect.collidepoint(event.pos):
+                        is_paused = True
+                        pause_start_ticks = current_ticks # Record time when pause starts
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 1:
                     mouse_button_down = False # Always release mouse button
@@ -444,33 +461,59 @@ def main_game_session(screen, num_vertices, common_win_font, common_stats_font):
                 text_rect = retry_button_text_surface.get_rect(center=retry_button_rect.center)
                 screen.blit(retry_button_text_surface, text_rect)
 
-        if not game_won and not is_paused and common_stats_font: # Live timer
+        if not game_won and not is_paused and common_stats_font: # Live timer & Pause button
+            # Live timer
             timer_surface = common_stats_font.render(f"Time: {elapsed_time_seconds:.1f}", True, BLACK)
-            screen.blit(timer_surface, (10, 10))
+            screen.blit(timer_surface, (10, 50)) # Display timer a bit lower to make space for Pause button
+
+            # Gameplay Pause Button
+            if game_pause_button_text_surface:
+                pygame.draw.rect(screen, (220, 220, 220), pause_button_rect) # Light grey background
+                pygame.draw.rect(screen, BLACK, pause_button_rect, 1) # Border
+                pause_text_rect = game_pause_button_text_surface.get_rect(center=pause_button_rect.center)
+                screen.blit(game_pause_button_text_surface, pause_text_rect)
 
         if is_paused:
             overlay_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
             overlay_surface.fill((0, 0, 0, 180)) # Semi-transparent black
             screen.blit(overlay_surface, (0,0))
 
-            if paused_text_surface:
-                paused_rect = paused_text_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 60))
-                screen.blit(paused_text_surface, paused_rect)
+            # --- Render Pause Menu ---
+            menu_item_y_start = SCREEN_HEIGHT // 2 - 80 # Start higher for "Paused" text
 
-            button_width_pause = 150
+            if paused_text_surface:
+                paused_rect = paused_text_surface.get_rect(center=(SCREEN_WIDTH // 2, menu_item_y_start))
+                screen.blit(paused_text_surface, paused_rect)
+                menu_item_y_start += 70 # Space after title
+
+            button_width_pause = 180 # Slightly wider for "Resume"
             button_height_pause = 50
+            button_spacing = 20 # Space between buttons
+
+            # Resume Button
+            if resume_text_surface:
+                # Define rect dynamically for centering and layout
+                resume_button_rect = pygame.Rect(SCREEN_WIDTH // 2 - button_width_pause // 2, menu_item_y_start, button_width_pause, button_height_pause)
+                pygame.draw.rect(screen, (200,200,200), resume_button_rect)
+                pygame.draw.rect(screen, BLACK, resume_button_rect, 2)
+                resume_text_rect = resume_text_surface.get_rect(center=resume_button_rect.center)
+                screen.blit(resume_text_surface, resume_text_rect)
+                menu_item_y_start += button_height_pause + button_spacing
 
             # Reset button
             if pause_reset_text_surface:
-                pause_reset_button_rect = pygame.Rect(SCREEN_WIDTH // 2 - button_width_pause // 2, SCREEN_HEIGHT // 2, button_width_pause, button_height_pause)
+                # Define rect dynamically
+                pause_reset_button_rect = pygame.Rect(SCREEN_WIDTH // 2 - button_width_pause // 2, menu_item_y_start, button_width_pause, button_height_pause)
                 pygame.draw.rect(screen, (200,200,200), pause_reset_button_rect)
                 pygame.draw.rect(screen, BLACK, pause_reset_button_rect, 2)
                 reset_text_rect = pause_reset_text_surface.get_rect(center=pause_reset_button_rect.center)
                 screen.blit(pause_reset_text_surface, reset_text_rect)
+                menu_item_y_start += button_height_pause + button_spacing
 
             # Quit button
             if pause_quit_text_surface:
-                pause_quit_button_rect = pygame.Rect(SCREEN_WIDTH // 2 - button_width_pause // 2, SCREEN_HEIGHT // 2 + 70, button_width_pause, button_height_pause)
+                # Define rect dynamically
+                pause_quit_button_rect = pygame.Rect(SCREEN_WIDTH // 2 - button_width_pause // 2, menu_item_y_start, button_width_pause, button_height_pause)
                 pygame.draw.rect(screen, (200,200,200), pause_quit_button_rect)
                 pygame.draw.rect(screen, BLACK, pause_quit_button_rect, 2)
                 quit_text_rect = pause_quit_text_surface.get_rect(center=pause_quit_button_rect.center)
