@@ -380,7 +380,7 @@ def main_game_session(screen, win_fnt, stats_fnt, fixed_n_v=None):
                         for i,(vx,vy) in enumerate(g_v):
                             if ((vx-mx)**2+(vy-my)**2)**0.5 < VERTEX_RADIUS: sel_v_idx=i;break
                 elif ev.button==3: # RIGHT CLICK - UI Buttons
-                    if not paused and not g_won and pause_btn_r.collidepoint(ev.pos): is_paused=True;p_s_ticks=c_ticks
+                    if not paused and not g_won and pause_btn_r.collidepoint(ev.pos): paused=True;p_s_ticks=c_ticks
                     elif paused:
                         if res_btn_r and res_btn_r.collidepoint(ev.pos): is_paused=False;s_time+=c_ticks-p_s_ticks
                         elif pr_btn_r and pr_btn_r.collidepoint(ev.pos): return "RESTART_SAME",n_v_sess
