@@ -151,12 +151,34 @@ def capture_game_view(screen_w_param, screen_h_param, bg_color,
             current_y_text += line_height
 
     try:
-        pygame.image.save(capture_surface, filename)
-        print(f"Screenshot saved to {filename}")
-        return filename
+        # pygame Surface → string buffer
+        import io
+        from PIL import Image
+        import win32clipboard
+
+        # Convert pygame.Surface to string buffer using pygame.image.tostring
+        image_str = pygame.image.tostring(capture_surface, "RGB")
+        image_size = capture_surface.get_size()
+        image_pil = Image.frombytes("RGB", image_size, image_str)
+
+        # Convert to BMP (Windows clipboard expects CF_DIB format)
+        output = io.BytesIO()
+        image_pil.save(output, "BMP")
+        data = output.getvalue()[14:]  # Strip BMP header (14 bytes)
+
+        output.close()
+
+        win32clipboard.OpenClipboard()
+        win32clipboard.EmptyClipboard()
+        win32clipboard.SetClipboardData(win32clipboard.CF_DIB, data)
+        win32clipboard.CloseClipboard()
+
+        print("Screenshot copied to clipboard.")
+        return "clipboard"
     except Exception as e:
-        print(f"Error saving screenshot: {e}")
+        print(f"Error copying screenshot to clipboard: {e}")
         return None
+
 
 def draw_graph(screen_s, g_verts, g_edges, v_rad, cross_s=None):
     if cross_s is None: cross_s=set()
