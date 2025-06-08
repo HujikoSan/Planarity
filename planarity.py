@@ -38,7 +38,7 @@ VERTEX_RADIUS = 10
 
 DEFAULT_NUM_VERTICES = 6
 MIN_VERTICES = 3
-MAX_VERTICES = 20
+MAX_VERTICES = 40
 
 def generate_random_planar_graph(n):
     vertices = []
@@ -276,6 +276,7 @@ def handle_input_screen_logic(events, current_input_text, text_box_is_active, er
     """
     action_taken = None # Default: no action, stay on input screen
     new_error_message = error_message # Persist error unless cleared
+    text_box_is_active = True # Default to active for input
 
     for event in events:
         if event.type == pygame.QUIT:
@@ -300,6 +301,7 @@ def handle_input_screen_logic(events, current_input_text, text_box_is_active, er
                             new_error_message = "" # Clear error
                         else:
                             new_error_message = f"Range: {MIN_VERTICES}-{MAX_VERTICES}"
+                            current_input_text = "" # Clear input on error
                 except ValueError:
                     new_error_message = "Invalid number!"
 
@@ -318,6 +320,7 @@ def handle_input_screen_logic(events, current_input_text, text_box_is_active, er
                                 new_error_message = ""
                             else:
                                 new_error_message = f"Range: {MIN_VERTICES}-{MAX_VERTICES}"
+                                current_input_text = "" # Clear input on error
                     except ValueError:
                         new_error_message = "Invalid number!"
                 elif event.key == pygame.K_BACKSPACE:
