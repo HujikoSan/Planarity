@@ -1,0 +1,109 @@
+# Configuration settings for the Planarity game
+
+game_title: "Planarity Game"
+
+screen:
+  default_width: 800
+  default_height: 600
+  background_color: [255, 255, 255] # WHITE
+
+colors:
+  white: [255, 255, 255]
+  black: [0, 0, 0]
+  # Vertex and Edge Colors
+  vertex_default: [255, 0, 0]          # RED_VERTEX
+  edge_non_crossing: [0, 150, 0]     # GREEN_EDGE_NON_CROSSING
+  edge_crossing: [200, 0, 0]         # RED_EDGE_CROSSING
+  # UI Colors
+  win_message: [0, 128, 0]           # WIN_MESSAGE_COLOR
+  error_text: [255, 0, 0]            # ERROR_TEXT_COLOR (same as RED_VERTEX)
+  prompt_text: [0, 0, 0]             # PROMPT_TEXT_COLOR (same as BLACK)
+  button_text_default: [0, 0, 0]     # BUTTON_TEXT_COLOR (same as BLACK)
+  # Input Screen Specific
+  input_box_inactive_bg: [173, 216, 230] # lightskyblue3 (RGB, Pygame will handle alpha if not provided)
+  input_box_active_bg: [30, 144, 255]    # dodgerblue2 (RGB)
+  input_start_button_bg: [179, 179, 179] # gray70 (RGB)
+  # In-Game UI Specific
+  pause_overlay_bg: [0, 0, 0, 180]       # RGBA for semi-transparency
+  pause_button_bg: [220, 220, 220, 180]  # RGBA for semi-transparent button
+  pause_menu_button_bg: [200, 200, 200]  # Standard opaque button
+  # Win Screen Specific
+  win_screen_button_new_game_bg: [200, 200, 200]
+  win_screen_button_retry_bg: [200, 200, 200]
+  win_screen_button_capture_bg: [200, 200, 180] # Yellowish
+  win_screen_button_post_x_bg: [180, 180, 220]  # Bluish
+  # Other UI
+  screenshot_message_bg: [230, 230, 230]
+
+vertex:
+  radius: 10
+  min_count: 3
+  max_count: 40
+  default_count: 6
+  generation_min_dist_sq: 2500 # 50*50
+
+edge:
+  line_thickness: 2
+
+font_sizes:
+  title: 74
+  stats: 36       # Also used for some button texts, messages
+  input_field: 36 # Consistent with stats font
+  ui_button: 36   # For general buttons like "Start", "Pause" menu items
+  small_ui: 24    # For smaller text like screenshot stats, copyright, etc.
+
+text_input_ui: # For the initial screen where user inputs number of vertices
+  box_width: 200
+  box_height: 50
+  prompt_y_offset: 40 # From top of text box to center of prompt text
+  text_x_padding: 8   # Inside the text box
+  start_button_width: 100
+  start_button_height: 50
+  start_button_y_offset: 75 # From center of text box to center of start button
+  error_message_y_offset: 30 # From bottom of start button to center of error message
+
+game_ui: # For in-game elements like pause button, win screen, pause menu
+  # Pause Button (top-left overlay button)
+  pause_button:
+    x: 10
+    y: 10
+    width: 85
+    height: 30
+    text: "Pause" # Text for the button
+  # Timer Display (approximated position)
+  timer:
+    x: 10
+    y: 50 # Below pause button
+  # Screenshot related text (e.g., "Saved: ...", "Copied to clipboard")
+  screenshot_message_y_from_bottom: 30 # Centered message this far from bottom
+  screenshot_stats_font_size: 24 # Uses font_sizes.small_ui
+  screenshot_stats_x_padding: 5
+  screenshot_stats_y_padding: 5
+  screenshot_stats_line_spacing: 2
+  # Win Screen Layout
+  win_screen:
+    button_width: 220 # Max width for standard buttons
+    button_height: 40
+    button_spacing: 8 # Vertical space between buttons
+    title_spacing_after: 10 # Space after "You Win!" title
+    stats_spacing_after: 3  # Space after each stat line
+    buttons_block_spacing_before: 20 # Space before the block of buttons
+    buttons: # Text for these buttons, order can define display order
+      - { id: "new_game", text: "New Game" }
+      - { id: "retry_same", text: "Retry Same Level" }
+      - { id: "capture_view", text: "Capture View" }
+      - { id: "post_to_x", text: "Post to X" }
+  # Pause Menu Layout
+  pause_menu:
+    title_text: "Paused"
+    button_width: 180
+    button_height: 50
+    button_spacing: 15 # Vertical space between buttons
+    title_y_offset_before_buttons: 60 # From center of title to top of first button
+    buttons: # Text for these buttons, order can define display order
+      - { id: "resume", text: "Resume" }
+      - { id: "reset_level", text: "Reset Level" }
+      - { id: "quit_to_menu", text: "Quit to Menu" }
+
+# Default filename for screenshots (if clipboard fails or not used)
+screenshot_default_filename: "planarity_screenshot.png"
