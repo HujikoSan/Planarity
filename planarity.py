@@ -2,6 +2,13 @@ import pygame
 import random
 import webbrowser
 import urllib.parse
+import enum
+
+# Game States
+class GameState(enum.Enum):
+    INPUT_SCREEN = 1
+    IN_GAME = 2
+    # Consider adding GAME_OVER or PAUSED if needed for more complex state management
 
 # Screen dimensions (constants)
 SCREEN_WIDTH = 800
@@ -15,6 +22,13 @@ GREEN_EDGE_NON_CROSSING = (0, 150, 0)
 RED_EDGE_CROSSING = (200, 0, 0)
 WIN_MESSAGE_COLOR = (0, 128, 0)
 
+INPUT_BOX_COLOR_INACTIVE = pygame.Color('lightskyblue3')
+INPUT_BOX_COLOR_ACTIVE = pygame.Color('dodgerblue2')
+BUTTON_COLOR = pygame.Color('gray70') # A neutral button color
+BUTTON_TEXT_COLOR = BLACK
+ERROR_TEXT_COLOR = RED_VERTEX # Re-use existing red for errors
+PROMPT_TEXT_COLOR = BLACK
+
 # Vertex and Edge data structures
 # Vertices: list of (x, y) coordinates
 # Edges: list of (vertex_index1, vertex_index2) pairs
@@ -25,17 +39,6 @@ VERTEX_RADIUS = 10
 DEFAULT_NUM_VERTICES = 6
 MIN_VERTICES = 3
 MAX_VERTICES = 20
-
-def get_num_vertices_from_user():
-    num_vertices = DEFAULT_NUM_VERTICES
-    try:
-        raw_input_str = input(f"Enter # vertices ({MIN_VERTICES}-{MAX_VERTICES}, def: {DEFAULT_NUM_VERTICES}): ")
-        val = int(raw_input_str)
-        if MIN_VERTICES <= val <= MAX_VERTICES: num_vertices = val
-        else: print(f"Input out of range. Using default: {DEFAULT_NUM_VERTICES}.")
-    except ValueError: print(f"Invalid input. Using default: {DEFAULT_NUM_VERTICES}.")
-    except EOFError: print(f"No input (EOF). Using default: {DEFAULT_NUM_VERTICES}.")
-    return num_vertices
 
 def generate_random_planar_graph(n):
     vertices = []
@@ -222,8 +225,117 @@ def get_crossing_edges(g_verts, g_edges):
             if do_lines_intersect(p1,q1,p2,q2): cross_set.add(e1); cross_set.add(e2)
     return cross_set
 
+def draw_input_screen(screen, text_input_font, title_font, text_box_rect, start_button_rect, current_input_text, error_msg_text, text_box_is_active):
+    """Draws the vertex number input screen."""
+    screen.fill(WHITE)
+
+    # Draw title/prompt
+    prompt_surface = title_font.render(f"Enter Vertices ({MIN_VERTICES}-{MAX_VERTICES}):", True, PROMPT_TEXT_COLOR)
+    prompt_rect = prompt_surface.get_rect(center=(SCREEN_WIDTH // 2, text_box_rect.y - 40)) # Adjust y as needed
+    screen.blit(prompt_surface, prompt_rect)
+
+    # Draw text input box
+    box_color = INPUT_BOX_COLOR_ACTIVE if text_box_is_active else INPUT_BOX_COLOR_INACTIVE
+    pygame.draw.rect(screen, box_color, text_box_rect) # Filled box
+    pygame.draw.rect(screen, BLACK, text_box_rect, 2)  # Border
+
+    input_text_surface = text_input_font.render(current_input_text, True, BLACK)
+    # Position text inside the box, with a small padding
+    screen.blit(input_text_surface, (text_box_rect.x + 8, text_box_rect.y + (text_box_rect.height - input_text_surface.get_height()) // 2))
+
+
+    # Draw Start button
+    pygame.draw.rect(screen, BUTTON_COLOR, start_button_rect) # Filled button
+    pygame.draw.rect(screen, BLACK, start_button_rect, 2) # Border
+
+    start_text_surface = text_input_font.render("Start", True, BUTTON_TEXT_COLOR)
+    start_text_rect = start_text_surface.get_rect(center=start_button_rect.center)
+    screen.blit(start_text_surface, start_text_rect)
+
+    # Draw error message, if any
+    if error_msg_text:
+        error_surface = text_input_font.render(error_msg_text, True, ERROR_TEXT_COLOR)
+        error_rect = error_surface.get_rect(center=(SCREEN_WIDTH // 2, start_button_rect.bottom + 30)) # Below button
+        screen.blit(error_surface, error_rect)
+
+    pygame.display.flip()
+
+# These rects need to be globally accessible for handle_input_screen_logic
+# or passed into it if defined within main_application.
+# Defining them globally for now for simplicity with the proposed function signature.
+TEXT_BOX_RECT = pygame.Rect(SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT // 2 - 25, 200, 50)
+START_BUTTON_RECT = pygame.Rect(SCREEN_WIDTH // 2 - 50, SCREEN_HEIGHT // 2 + 50, 100, 50)
+
+def handle_input_screen_logic(events, current_input_text, text_box_is_active, error_message):
+    """Handles events and logic for the input screen.
+    Returns: (new_input_text, new_text_box_active, new_error_message, action)
+    action can be:
+        None: Continue on input screen
+        int: Number of vertices to start game with
+        "QUIT_APP": Signal to quit the application
+    """
+    action_taken = None # Default: no action, stay on input screen
+    new_error_message = error_message # Persist error unless cleared
+
+    for event in events:
+        if event.type == pygame.QUIT:
+            return current_input_text, text_box_is_active, new_error_message, "QUIT_APP"
+
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if TEXT_BOX_RECT.collidepoint(event.pos):
+                text_box_is_active = True
+                new_error_message = "" # Clear error when box is clicked
+            else:
+                text_box_is_active = False
+
+            if START_BUTTON_RECT.collidepoint(event.pos):
+                text_box_is_active = False # Deactivate box on button click
+                try:
+                    if not current_input_text: # Check if empty
+                        new_error_message = "Input is empty!"
+                    else:
+                        num_v = int(current_input_text)
+                        if MIN_VERTICES <= num_v <= MAX_VERTICES:
+                            action_taken = num_v # Valid number, signal to start game
+                            new_error_message = "" # Clear error
+                        else:
+                            new_error_message = f"Range: {MIN_VERTICES}-{MAX_VERTICES}"
+                except ValueError:
+                    new_error_message = "Invalid number!"
+
+        if event.type == pygame.KEYDOWN:
+            if text_box_is_active:
+                new_error_message = "" # Clear error on typing
+                if event.key == pygame.K_RETURN: # Enter key
+                    # Same logic as clicking start button
+                    try:
+                        if not current_input_text:
+                            new_error_message = "Input is empty!"
+                        else:
+                            num_v = int(current_input_text)
+                            if MIN_VERTICES <= num_v <= MAX_VERTICES:
+                                action_taken = num_v
+                                new_error_message = ""
+                            else:
+                                new_error_message = f"Range: {MIN_VERTICES}-{MAX_VERTICES}"
+                    except ValueError:
+                        new_error_message = "Invalid number!"
+                elif event.key == pygame.K_BACKSPACE:
+                    current_input_text = current_input_text[:-1]
+                else:
+                    # Only allow digits and limit length
+                    if event.unicode.isdigit() and len(current_input_text) < 3: # Max 2 digits + safety for MAX_VERTICES
+                        current_input_text += event.unicode
+                    elif not event.unicode.isdigit() and event.key != pygame.K_BACKSPACE: # only show error if it's not backspace
+                        new_error_message = "Only digits allowed."
+
+    return current_input_text, text_box_is_active, new_error_message, action_taken
+
 def main_game_session(screen, win_fnt, stats_fnt, fixed_n_v=None):
-    n_v_sess = fixed_n_v if fixed_n_v is not None else get_num_vertices_from_user()
+    n_v_sess = fixed_n_v # Directly use fixed_n_v
+    # It's assumed fixed_n_v will always be valid when this function is called.
+    # If fixed_n_v could be None or invalid, error handling or a default would be needed here.
+    # For now, the design ensures main_application provides a valid number.
     g_v, g_e = generate_random_planar_graph(n_v_sess)
     sel_v_idx, m_down = None,False; cross_set = get_crossing_edges(g_v,g_e)
     s_time, elap_s = pygame.time.get_ticks(),0.0; g_won,paused,p_s_ticks = False,False,0
@@ -272,9 +384,9 @@ def main_game_session(screen, win_fnt, stats_fnt, fixed_n_v=None):
                     elif paused:
                         if res_btn_r and res_btn_r.collidepoint(ev.pos): is_paused=False;s_time+=c_ticks-p_s_ticks
                         elif pr_btn_r and pr_btn_r.collidepoint(ev.pos): return "RESTART_SAME",n_v_sess
-                        elif pq_btn_r and pq_btn_r.collidepoint(ev.pos): return "RESTART",None
+                        elif pq_btn_r and pq_btn_r.collidepoint(ev.pos): return "MAIN_MENU",None # Changed from RESTART
                     elif g_won:
-                        if r_btn_r and r_btn_r.collidepoint(ev.pos): return "RESTART",None
+                        if r_btn_r and r_btn_r.collidepoint(ev.pos): return "MAIN_MENU",None # Changed from RESTART
                         elif rs_btn_r and rs_btn_r.collidepoint(ev.pos): return "RESTART_SAME",n_v_sess
                         elif cap_btn_r and cap_btn_r.collidepoint(ev.pos):
                             sf = capture_game_view(
@@ -376,14 +488,68 @@ def main_application():
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption("Planarity")
     win_fnt, stats_fnt = None, None
-    try: win_fnt = pygame.font.Font(None, 74); stats_fnt = pygame.font.Font(None, 36)
-    except Exception as e: print(f"Font loading failed: {e}")
-    fixed_n = None
-    while True:
-        status, data = main_game_session(screen, win_fnt, stats_fnt, fixed_n_v=fixed_n) # Corrected keyword
-        if status == "QUIT": break
-        elif status == "RESTART": fixed_n = None
-        elif status == "RESTART_SAME": fixed_n = data
+    try:
+        win_fnt = pygame.font.Font(None, 74)
+        stats_fnt = pygame.font.Font(None, 36)
+    except Exception as e:
+        print(f"Font loading failed: {e}")
+
+    # Fonts for input screen
+    input_field_font = stats_fnt if stats_fnt else pygame.font.Font(None, 32)
+    title_prompt_font = win_fnt if win_fnt else pygame.font.Font(None, 48)
+    # Safety fallbacks if font loading failed and primary fonts are None
+    if not input_field_font: input_field_font = pygame.font.Font(None, 32)
+    if not title_prompt_font: title_prompt_font = pygame.font.Font(None, 48)
+
+
+    current_state = GameState.INPUT_SCREEN
+    num_vertices_for_game = DEFAULT_NUM_VERTICES
+
+    input_text = ""
+    text_box_active = False
+    error_message = ""
+
+    running = True
+    while running:
+        events = pygame.event.get()
+
+        if current_state == GameState.INPUT_SCREEN:
+            input_text, text_box_active, error_message, action = handle_input_screen_logic(
+                events, input_text, text_box_active, error_message
+            )
+
+            if isinstance(action, int):
+                num_vertices_for_game = action
+                current_state = GameState.IN_GAME
+                input_text = ""
+                error_message = ""
+                text_box_active = False
+            elif action == "QUIT_APP":
+                running = False
+
+            draw_input_screen(screen, input_field_font, title_prompt_font, TEXT_BOX_RECT, START_BUTTON_RECT, input_text, error_message, text_box_active)
+
+        elif current_state == GameState.IN_GAME:
+            # Pass 'events' to main_game_session if it's refactored to use them,
+            # or ensure its internal event loop doesn't conflict.
+            # For now, main_game_session handles its own events.
+            game_status, data = main_game_session(screen, win_fnt, stats_fnt, fixed_n_v=num_vertices_for_game)
+
+            if game_status == "QUIT":
+                running = False
+            # Removed "RESTART" case, replaced by "MAIN_MENU"
+            elif game_status == "MAIN_MENU":
+                current_state = GameState.INPUT_SCREEN
+                num_vertices_for_game = DEFAULT_NUM_VERTICES
+                input_text = ""
+                error_message = ""
+                text_box_active = False
+            elif game_status == "RESTART_SAME":
+                num_vertices_for_game = data
+                # current_state remains IN_GAME
+
+        # pygame.display.flip() # Moved to draw_input_screen and main_game_session's loop
+
     pygame.quit()
 
 if __name__ == '__main__':
