@@ -157,12 +157,12 @@ def main_application():
             game_event_config = {
                 "current_screen_width": current_screen_width,
                 "current_screen_height": current_screen_height,
-                "win_screen_buttons": getattr(
-                    game_session, "win_button_rects_hack", {}
-                ),
-                "pause_screen_buttons": getattr(
-                    game_session, "pause_button_rects_hack", {}
-                ),
+                # "win_screen_buttons": getattr(  # No longer used by input_handling for dynamic buttons
+                #     game_session, "win_button_rects_hack", {}
+                # ),
+                # "pause_screen_buttons": getattr( # No longer used by input_handling for dynamic buttons
+                #     game_session, "pause_button_rects_hack", {}
+                # ),
             }
             game_status = input_handling.handle_game_events(
                 events, game_session, game_event_config
@@ -233,14 +233,10 @@ def main_application():
                     screen.blit(
                         time_surf, (settings.game_ui.timer.x, settings.game_ui.timer.y)
                     )
-                    # TODO: Draw Pause button visual based on settings.game_ui.pause_button and its state.
-                    # This would involve getting the pause button rect from config and drawing it.
-                    # For example:
-                    # pause_btn_cfg = settings.game_ui.pause_button
-                    # pygame.draw.rect(screen, settings.colors.pause_button_bg if not game_session.paused else settings.colors.resume_button_bg,
-                    #                  (pause_btn_cfg.x, pause_btn_cfg.y, pause_btn_cfg.width, pause_btn_cfg.height))
-                    # text_surf = STATS_FONT.render(pause_btn_cfg.text if not game_session.paused else "Resume", True, settings.colors.black)
-                    # screen.blit(text_surf, (pause_btn_cfg.x + 5, pause_btn_cfg.y + 5))
+                    # Draw the pause button and store its rect for input handling
+                    drawn_pause_button_rect = drawing.draw_pause_button(screen, STATS_FONT)
+                    if game_session: # Should always be true here
+                        game_session.ui_rects['pause_button'] = drawn_pause_button_rect
 
 
                 if game_session.is_won:
@@ -256,27 +252,32 @@ def main_application():
                         center=(current_screen_width / 2, win_rect_center_y)
                     )
                     screen.blit(win_surf, win_rect)
-                    # TODO: Draw win screen buttons (New Game, Retry, etc.) using settings.game_ui.win_screen
-                    # This would involve iterating settings.game_ui.win_screen.buttons, creating rects,
-                    # and drawing them. Store these rects in game_session.win_button_rects_hack for input_handling.
+
+                    # Prepare data for win screen elements
+                    win_game_data = {
+                        'num_vertices': game_session.graph.get_vertex_count(),
+                        'num_edges': game_session.graph.get_edge_count(),
+                        'elapsed_time': game_session.elapsed_time
+                    }
+                    # Draw win screen buttons and store their rects
+                    # Assuming STATS_FONT for stats text and button text on win screen
+                    drawn_win_button_rects = drawing.draw_win_screen_elements(
+                        screen, TITLE_FONT, STATS_FONT, STATS_FONT, win_game_data
+                    )
+                    if game_session: # Should always be true
+                        for btn_id, rect in drawn_win_button_rects.items():
+                            game_session.ui_rects[f'win_screen_{btn_id}'] = rect
 
                 if game_session.paused: # Use game_session.paused directly
-                    pause_surf = TITLE_FONT.render(
-                        settings.game_ui.pause_menu.title_text,
-                        True,
-                        settings.colors.black,
+                    drawing.draw_pause_menu_overlay(screen) # Use global screen from drawing module
+                    # Assuming STATS_FONT is suitable for button text, TITLE_FONT for "Paused" title
+                    # These fonts are loaded globally in main.py
+                    drawn_pause_menu_button_rects = drawing.draw_pause_menu_elements(
+                        screen, TITLE_FONT, STATS_FONT
                     )
-                    # TODO: Centralize UI layout logic
-                    pause_rect_center_y = current_screen_height / 2 - 50 # Placeholder
-                    if settings.game_ui.pause_menu and settings.game_ui.pause_menu.get("title_y_offset"):
-                         pause_rect_center_y = current_screen_height / 2 + settings.game_ui.pause_menu.title_y_offset
-
-                    pause_rect = pause_surf.get_rect(
-                        center=(current_screen_width / 2, pause_rect_center_y)
-                    )
-                    screen.blit(pause_surf, pause_rect)
-                    # TODO: Draw pause menu buttons (Resume, Reset, etc.) using settings.game_ui.pause_menu
-                    # Store these rects in game_session.pause_button_rects_hack for input_handling.
+                    if game_session: # Should always be true here
+                        for btn_id, rect in drawn_pause_menu_button_rects.items():
+                            game_session.ui_rects[f'pause_menu_{btn_id}'] = rect
 
             pygame.display.flip()
 

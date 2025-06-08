@@ -7,6 +7,7 @@ the overall game session.
 import time
 import random
 from typing import Optional, Set, List, Tuple, Dict
+import pygame # Added for pygame.Rect type hint
 
 from config import settings # For vertex_radius in GameSession init
 
@@ -338,6 +339,14 @@ class Graph:
                 return vertex
         return None
 
+    def get_vertex_count(self) -> int:
+        """Return the number of vertices in the graph."""
+        return len(self.vertices)
+
+    def get_edge_count(self) -> int:
+        """Return the number of edges in the graph."""
+        return len(self.edges)
+
     def __repr__(self) -> str:
         return f"Graph(Vertices: {len(self.vertices)}, Edges: {len(self.edges)})"
 
@@ -355,7 +364,9 @@ class GameSession:
         self.selected_vertex: Optional[Vertex] = None
         self.paused: bool = False
         self._time_at_pause: float = 0.0
-        self.reset_game(num_vertices)
+        self.ui_rects: Dict[str, pygame.Rect] = {} # To store UI element rects
+
+        self.reset_game(num_vertices) # Initial graph generation
 
     def select_vertex(self, vertex: Optional[Vertex]):
         self.selected_vertex = vertex

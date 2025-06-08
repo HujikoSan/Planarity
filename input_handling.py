@@ -190,10 +190,15 @@ def handle_game_events(
         "current_screen_height", settings.screen.default_height
     )
 
-    pause_btn_cfg = settings.game_ui.pause_button
-    pause_btn_r = pygame.Rect(
-        pause_btn_cfg.x, pause_btn_cfg.y, pause_btn_cfg.width, pause_btn_cfg.height
-    )
+    # Retrieve the dynamically drawn pause button rect from game_session
+    # Fallback to config if not found, though it should always be there if drawn by main.py
+    pause_button_rect = game_session.ui_rects.get('pause_button')
+    if not pause_button_rect:
+        # Fallback to static config if not available dynamically
+        # This is a safety measure; ideally, it's always passed from where it's drawn.
+        pause_cfg = settings.game_ui.pause_button
+        pause_button_rect = pygame.Rect(pause_cfg.x, pause_cfg.y, pause_cfg.width, pause_cfg.height)
+
 
     win_screen_buttons = config_params.get("win_screen_buttons", {})
     pause_screen_buttons = config_params.get("pause_screen_buttons", {})
@@ -235,52 +240,51 @@ def handle_game_events(
             return "VIDEO_RESIZE"
 
         if event.type == pygame.MOUSEBUTTONDOWN:
-            mx, my = event.pos
-            if event.button == 1:  # LEFT CLICK
-                if not game_session.is_won and not game_session.paused:
-                    m_down_local = True # Mouse button is now pressed for this event batch
-                    found_vertex = game_session.graph.find_vertex_at_pos((mx, my), vertex_radius_val)
-                    game_session.select_vertex(found_vertex) # Selects None if not found, deselecting
-                    # No need to manage temp_m_down_hack or temp_sel_v_idx_hack on game_session
+            if event.button == 1:  # LEFT CLICK for all primary interactions
+                mx, my = event.pos
 
-            elif event.button == 3:  # RIGHT CLICK
-                is_paused = game_session.paused # Directly use GameSession attribute
+                if game_session.paused:
+                    resume_rect = game_session.ui_rects.get('pause_menu_resume')
+                    reset_rect = game_session.ui_rects.get('pause_menu_reset_level')
+                    quit_rect = game_session.ui_rects.get('pause_menu_quit_to_menu')
 
-                if not is_paused and not game_session.is_won:
-                    if pause_btn_r.collidepoint(mx, my):
-                        game_session.toggle_pause() # Use the new method
-                        return "GAME_PAUSED" if game_session.paused else "GAME_RESUMED" # Status reflects actual state
-                elif is_paused: # game_session.paused is True
-                    if pause_screen_buttons.get(
-                        "resume_button_rect", pygame.Rect(0, 0, 0, 0)
-                    ).collidepoint(mx, my):
-                        game_session.toggle_pause() # Use the new method
+                    if resume_rect and resume_rect.collidepoint(mx, my):
+                        game_session.toggle_pause()
                         return "GAME_RESUMED"
-                    elif pause_screen_buttons.get(
-                        "reset_button_rect", pygame.Rect(0, 0, 0, 0) # Rects are passed in config_params
-                    ).collidepoint(mx, my):
+                    elif reset_rect and reset_rect.collidepoint(mx, my):
                         return "RESTART_SAME"
-                    elif pause_screen_buttons.get(
-                        "quit_button_rect", pygame.Rect(0, 0, 0, 0)
-                    ).collidepoint(mx, my):
+                    elif quit_rect and quit_rect.collidepoint(mx, my):
                         return "MAIN_MENU"
+                    # If no pause menu button is clicked, do nothing more for this event.
+
                 elif game_session.is_won:
-                    if win_screen_buttons.get(
-                        "new_game_button_rect", pygame.Rect(0, 0, 0, 0)
-                    ).collidepoint(mx, my):
+                    new_game_rect = game_session.ui_rects.get('win_screen_new_game')
+                    retry_rect = game_session.ui_rects.get('win_screen_retry_same_level')
+                    capture_rect = game_session.ui_rects.get('win_screen_capture_view')
+                    post_x_rect = game_session.ui_rects.get('win_screen_post_to_x')
+
+                    if new_game_rect and new_game_rect.collidepoint(mx, my):
                         return "MAIN_MENU"
-                    elif win_screen_buttons.get(
-                        "retry_same_button_rect", pygame.Rect(0, 0, 0, 0)
-                    ).collidepoint(mx, my):
+                    elif retry_rect and retry_rect.collidepoint(mx, my):
                         return "RESTART_SAME"
-                    elif win_screen_buttons.get(
-                        "capture_button_rect", pygame.Rect(0, 0, 0, 0)
-                    ).collidepoint(mx, my):
+                    elif capture_rect and capture_rect.collidepoint(mx, my):
                         return "CAPTURE_VIEW_REQUESTED"
-                    elif win_screen_buttons.get(
-                        "post_to_x_button_rect", pygame.Rect(0, 0, 0, 0)
-                    ).collidepoint(mx, my):
+                    elif post_x_rect and post_x_rect.collidepoint(mx, my):
                         return "POST_TO_X_REQUESTED"
+                    # If no win screen button is clicked, do nothing more for this event.
+
+                else:  # Active game state (not paused, not won)
+                    # 1. Check Pause Button first
+                    if pause_button_rect and pause_button_rect.collidepoint(mx, my):
+                        game_session.toggle_pause()
+                        return "GAME_PAUSED" # The new state is paused
+                    else:
+                        # 2. If Pause button not clicked, then handle vertex selection
+                        m_down_local = True
+                        found_vertex = game_session.graph.find_vertex_at_pos((mx, my), vertex_radius_val)
+                        game_session.select_vertex(found_vertex)
+
+            # elif event.button == 3: # RIGHT CLICK - currently no actions assigned for right click in this new scheme
 
         elif event.type == pygame.MOUSEBUTTONUP:
             if event.button == 1:

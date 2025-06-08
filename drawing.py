@@ -191,6 +191,216 @@ def draw_graph(
         pygame.draw.circle(screen, vertex_color, (vertex.x, vertex.y), vertex_radius)
 
 
+def draw_pause_button(target_screen: pygame.Surface, font: pygame.font.Font) -> pygame.Rect:
+    """Draw the pause button on the given screen.
+
+    Uses properties and colors from `config.settings.game_ui.pause_button`
+    and `config.settings.colors`.
+
+    Args:
+        target_screen: The Pygame Surface to draw on.
+        font: The Pygame Font object to use for the button text.
+
+    Returns:
+        pygame.Rect: The rectangle representing the bounds of the drawn button.
+    """
+    pause_cfg = settings.game_ui.pause_button
+
+    bg_color = settings.colors.pause_button_bg # Or a more specific one if defined
+    text_color = settings.colors.button_text_default # Assuming default button text color
+
+    pause_btn_rect = pygame.Rect(
+        pause_cfg.x, pause_cfg.y, pause_cfg.width, pause_cfg.height
+    )
+
+    # Draw button background (potentially with transparency if bg_color has alpha)
+    # If color has alpha (e.g. from config [r,g,b,a]), create a separate surface for transparency
+    if len(bg_color) == 4 and bg_color[3] < 255:
+        button_surface = pygame.Surface(pause_btn_rect.size, pygame.SRCALPHA)
+        button_surface.fill(bg_color)
+        target_screen.blit(button_surface, pause_btn_rect.topleft)
+    else:
+        pygame.draw.rect(target_screen, bg_color, pause_btn_rect)
+
+    pygame.draw.rect(target_screen, settings.colors.black, pause_btn_rect, 1)  # Border (thinner)
+
+    text_surf = font.render(pause_cfg.text, True, text_color)
+    text_rect = text_surf.get_rect(center=pause_btn_rect.center)
+    target_screen.blit(text_surf, text_rect)
+
+    return pause_btn_rect
+
+
+def draw_pause_menu_overlay(target_screen: pygame.Surface):
+    """Draw a semi-transparent overlay for the pause menu.
+
+    Args:
+        target_screen: The Pygame Surface to draw on (main screen).
+    """
+    overlay_color = settings.colors.pause_overlay_bg
+    overlay_surface = pygame.Surface(target_screen.get_size(), pygame.SRCALPHA)
+    overlay_surface.fill(overlay_color)
+    target_screen.blit(overlay_surface, (0, 0))
+
+
+def draw_pause_menu_elements(target_screen: pygame.Surface, title_font: pygame.font.Font, button_font: pygame.font.Font) -> dict[str, pygame.Rect]:
+    """Draw the pause menu title and buttons.
+
+    Calculates positions based on screen center and configured spacings.
+
+    Args:
+        target_screen: The Pygame Surface to draw on.
+        title_font: Font for the "Paused" title.
+        button_font: Font for the menu buttons.
+
+    Returns:
+        A dictionary mapping button IDs (e.g., 'resume', 'reset_level')
+        to their pygame.Rect objects.
+    """
+    button_rects = {}
+    screen_width = target_screen.get_width()
+    screen_height = target_screen.get_height()
+
+    menu_cfg = settings.game_ui.pause_menu
+
+    # Draw Title
+    title_surf = title_font.render(
+        menu_cfg.title_text, True, settings.colors.black # Assuming black for title
+    )
+    # Calculate total height of menu for centering (approximate)
+    num_buttons = len(menu_cfg.buttons)
+    total_button_height = num_buttons * menu_cfg.button_height + max(0, num_buttons - 1) * menu_cfg.button_spacing
+    title_height = title_surf.get_height()
+    total_menu_height = title_height + menu_cfg.title_y_offset_before_buttons + total_button_height
+
+    start_y = screen_height // 2 - total_menu_height // 2
+
+    title_rect = title_surf.get_rect(center=(screen_width // 2, start_y + title_height // 2))
+    target_screen.blit(title_surf, title_rect)
+
+    current_y = start_y + title_height + menu_cfg.title_y_offset_before_buttons
+
+    # Draw Buttons
+    for btn_def in menu_cfg.buttons:
+        btn_id = btn_def.id
+        btn_text = btn_def.text
+
+        btn_rect = pygame.Rect(
+            screen_width // 2 - menu_cfg.button_width // 2,
+            current_y,
+            menu_cfg.button_width,
+            menu_cfg.button_height
+        )
+        button_rects[btn_id] = btn_rect
+
+        # Draw button background and border
+        pygame.draw.rect(target_screen, settings.colors.pause_menu_button_bg, btn_rect)
+        pygame.draw.rect(target_screen, settings.colors.black, btn_rect, 2)
+
+        # Render and blit text
+        text_surf = button_font.render(btn_text, True, settings.colors.button_text_default)
+        text_rect = text_surf.get_rect(center=btn_rect.center)
+        target_screen.blit(text_surf, text_rect)
+
+        current_y += menu_cfg.button_height + menu_cfg.button_spacing
+
+    return button_rects
+
+
+def draw_win_screen_elements(
+    target_screen: pygame.Surface,
+    title_font: pygame.font.Font,
+    stats_font: pygame.font.Font, # Font for stats like V, E, Time
+    button_font: pygame.font.Font, # Font for button text
+    game_session_data: dict # Contains num_vertices, num_edges, elapsed_time
+) -> dict[str, pygame.Rect]:
+    """Draw the win screen title, game statistics, and action buttons.
+
+    Calculates positions based on screen center and configured spacings.
+
+    Args:
+        target_screen: The Pygame Surface to draw on.
+        title_font: Font for the "You Win!" title.
+        stats_font: Font for the game statistics.
+        button_font: Font for the menu buttons.
+        game_session_data: A dictionary with keys 'num_vertices', 'num_edges',
+                           and 'elapsed_time'.
+
+    Returns:
+        A dictionary mapping button IDs (e.g., 'new_game', 'retry_same')
+        to their pygame.Rect objects.
+    """
+    button_rects = {}
+    screen_width = target_screen.get_width()
+    screen_height = target_screen.get_height()
+
+    win_cfg = settings.game_ui.win_screen
+    colors = settings.colors
+
+    # --- Calculate total height for vertical centering ---
+    title_surf_temp = title_font.render("You Win!", True, colors.win_message)
+    title_height = title_surf_temp.get_height()
+
+    stats_texts = [
+        f"Vertices: {game_session_data['num_vertices']}",
+        f"Edges: {game_session_data['num_edges']}",
+        f"Time: {game_session_data['elapsed_time']:.1f}s",
+    ]
+    stats_surfaces = [stats_font.render(text, True, colors.win_message) for text in stats_texts]
+    stats_total_height = sum(s.get_height() for s in stats_surfaces) + max(0, len(stats_surfaces) - 1) * win_cfg.stats_spacing_after
+
+    num_buttons = len(win_cfg.buttons)
+    buttons_total_height = num_buttons * win_cfg.button_height + max(0, num_buttons - 1) * win_cfg.button_spacing
+
+    total_content_height = (
+        title_height + win_cfg.title_spacing_after +
+        stats_total_height + win_cfg.buttons_block_spacing_before +
+        buttons_total_height
+    )
+    current_y = screen_height // 2 - total_content_height // 2
+
+    # 1. Draw Title
+    title_rect = title_surf_temp.get_rect(center=(screen_width // 2, current_y + title_height // 2))
+    target_screen.blit(title_surf_temp, title_rect)
+    current_y += title_height + win_cfg.title_spacing_after
+
+    # 2. Draw Stats
+    for stat_surf in stats_surfaces:
+        stat_rect = stat_surf.get_rect(center=(screen_width // 2, current_y + stat_surf.get_height() // 2))
+        target_screen.blit(stat_surf, stat_rect)
+        current_y += stat_surf.get_height() + win_cfg.stats_spacing_after
+
+    current_y += win_cfg.buttons_block_spacing_before - win_cfg.stats_spacing_after # Adjust spacing before buttons
+
+    # 3. Draw Buttons
+    for btn_def in win_cfg.buttons:
+        btn_id = btn_def.id
+        btn_text = btn_def.text
+
+        btn_rect = pygame.Rect(
+            screen_width // 2 - win_cfg.button_width // 2, # Assuming all win buttons share same width from config
+            current_y,
+            win_cfg.button_width,
+            win_cfg.button_height
+        )
+        button_rects[btn_id] = btn_rect
+
+        # Determine button background color from config based on id
+        bg_color_key = f"win_screen_button_{btn_id}_bg" # e.g., win_screen_button_new_game_bg
+        btn_bg_color = getattr(colors, bg_color_key, colors.button_text_default) # Fallback color
+
+        pygame.draw.rect(target_screen, btn_bg_color, btn_rect)
+        pygame.draw.rect(target_screen, colors.black, btn_rect, 2) # Border
+
+        text_surf = button_font.render(btn_text, True, colors.button_text_default)
+        text_rect = text_surf.get_rect(center=btn_rect.center)
+        target_screen.blit(text_surf, text_rect)
+
+        current_y += win_cfg.button_height + win_cfg.button_spacing
+
+    return button_rects
+
+
 def draw_input_screen(
     text_input_font: pygame.font.Font,
     title_font: pygame.font.Font,
