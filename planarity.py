@@ -343,6 +343,9 @@ def main_game_session(screen, win_fnt, stats_fnt, fixed_n_v=None):
 
     r_btn_r,rs_btn_r,px_btn_r,cap_btn_r,pr_btn_r,pq_btn_r,res_btn_r = [None]*7
     pause_btn_r = pygame.Rect(10,10,85,30)
+    resume_button_rect = pygame.Rect(0,0,0,0)
+    pause_reset_button_rect = pygame.Rect(0,0,0,0)
+    pause_quit_button_rect = pygame.Rect(0,0,0,0)
 
     # Pre-render text surfaces
     ng_txt = stats_fnt.render("New Game", True, BLACK) if stats_fnt else None
@@ -382,9 +385,9 @@ def main_game_session(screen, win_fnt, stats_fnt, fixed_n_v=None):
                 elif ev.button==3: # RIGHT CLICK - UI Buttons
                     if not paused and not g_won and pause_btn_r.collidepoint(ev.pos): paused=True;p_s_ticks=c_ticks
                     elif paused:
-                        if res_btn_r and res_btn_r.collidepoint(ev.pos): is_paused=False;s_time+=c_ticks-p_s_ticks
-                        elif pr_btn_r and pr_btn_r.collidepoint(ev.pos): return "RESTART_SAME",n_v_sess
-                        elif pq_btn_r and pq_btn_r.collidepoint(ev.pos): return "MAIN_MENU",None # Changed from RESTART
+                        if resume_button_rect.collidepoint(ev.pos): is_paused=False;s_time+=c_ticks-p_s_ticks # resume_button_rect is already initialized
+                        elif pause_reset_button_rect.collidepoint(ev.pos): return "RESTART_SAME",n_v_sess
+                        elif pause_quit_button_rect.collidepoint(ev.pos): return "MAIN_MENU",None # Changed from RESTART
                     elif g_won:
                         if r_btn_r and r_btn_r.collidepoint(ev.pos): return "MAIN_MENU",None # Changed from RESTART
                         elif rs_btn_r and rs_btn_r.collidepoint(ev.pos): return "RESTART_SAME",n_v_sess
@@ -468,18 +471,24 @@ def main_game_session(screen, win_fnt, stats_fnt, fixed_n_v=None):
             ovl=pygame.Surface((SCREEN_WIDTH,SCREEN_HEIGHT),pygame.SRCALPHA);ovl.fill((0,0,0,180));screen.blit(ovl,(0,0))
             y_s=SCREEN_HEIGHT//2-100;bw,bh,s=180,50,15
             if paused_title:screen.blit(paused_title,paused_title.get_rect(center=(SCREEN_WIDTH//2,y_s)));y_s+=60
-            btns_p_d = [{'s':resume_txt,'r':resume_button_rect},{'s':reset_level_text,'r':pr_btn_r},{'s':quit_to_menu_text,'r':pq_btn_r}]
+
+            # Button data: text surface and corresponding rect object
+            # Note: 'reset_level_text' and 'quit_to_menu_text' seem to be undefined, using 'reset_txt' and 'quit_txt' which are defined
+            btns_p_d = [{'s':resume_txt,'r':resume_button_rect},
+                        {'s':reset_txt,'r':pause_reset_button_rect},
+                        {'s':quit_txt,'r':pause_quit_button_rect}]
+
             for i,b_d in enumerate(btns_p_d):
                 if b_d['s']: # Check if text surface exists
-                    # Dynamically assign rect to the button's dict or use pre-initialized ones if their scope allows
-                    # For pause menu, rects are defined here for simplicity as they are only used here.
-                    current_btn_rect = pygame.Rect(SCREEN_WIDTH//2-bw//2,y_s + i*(bh+s),bw,bh)
-                    if i==0: resume_button_rect = current_btn_rect # Assign for click detection
-                    elif i==1: pause_reset_button_rect = current_btn_rect
-                    elif i==2: pause_quit_button_rect = current_btn_rect
+                    # Update attributes of the pre-initialized rect
+                    target_rect = b_d['r']
+                    target_rect.width = bw
+                    target_rect.height = bh
+                    target_rect.centerx = SCREEN_WIDTH//2
+                    target_rect.top = y_s + i*(bh+s)
 
-                    pygame.draw.rect(screen,(200,200,200),current_btn_rect);pygame.draw.rect(screen,BLACK,current_btn_rect,2)
-                    screen.blit(b_d['s'],b_d['s'].get_rect(center=current_btn_rect.center))
+                    pygame.draw.rect(screen,(200,200,200),target_rect);pygame.draw.rect(screen,BLACK,target_rect,2)
+                    screen.blit(b_d['s'],b_d['s'].get_rect(center=target_rect.center))
         pygame.display.flip()
     return "QUIT", None
 
