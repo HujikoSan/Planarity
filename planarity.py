@@ -385,7 +385,7 @@ def main_game_session(screen, win_fnt, stats_fnt, fixed_n_v=None):
                 elif ev.button==3: # RIGHT CLICK - UI Buttons
                     if not paused and not g_won and pause_btn_r.collidepoint(ev.pos): paused=True;p_s_ticks=c_ticks
                     elif paused:
-                        if resume_button_rect.collidepoint(ev.pos): is_paused=False;s_time+=c_ticks-p_s_ticks # resume_button_rect is already initialized
+                        if resume_button_rect.collidepoint(ev.pos): paused=False;s_time+=c_ticks-p_s_ticks # resume_button_rect is already initialized
                         elif pause_reset_button_rect.collidepoint(ev.pos): return "RESTART_SAME",n_v_sess
                         elif pause_quit_button_rect.collidepoint(ev.pos): return "MAIN_MENU",None # Changed from RESTART
                     elif g_won:
