@@ -253,9 +253,9 @@ def draw_input_screen(
 
     # Draw text input box
     box_bg_color = (
-        settings.ui.input_box.active_color
+        settings.colors.input_box_active_bg # Corrected path
         if text_box_is_active
-        else settings.ui.input_box.inactive_color
+        else settings.colors.input_box_inactive_bg # Corrected path
     )
     pygame.draw.rect(screen, box_bg_color, text_box_rect)
     pygame.draw.rect(screen, settings.colors.black, text_box_rect, 2)  # Border
@@ -272,7 +272,7 @@ def draw_input_screen(
     )
 
     # Draw Start button
-    pygame.draw.rect(screen, settings.ui.input_start_button_bg, start_button_rect)
+    pygame.draw.rect(screen, settings.colors.input_start_button_bg, start_button_rect) # Corrected path
     pygame.draw.rect(screen, settings.colors.black, start_button_rect, 2)  # Border
 
     start_text_surface = text_input_font.render(
