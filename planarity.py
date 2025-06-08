@@ -14,8 +14,6 @@ class GameState(enum.Enum):
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
 
-initial_screen_width = 0
-initial_screen_height = 0
 current_screen_width = 0
 current_screen_height = 0
 
@@ -49,7 +47,7 @@ MIN_VERTICES = 3
 MAX_VERTICES = 40
 
 def generate_random_planar_graph(n):
-    global initial_screen_width, initial_screen_height, g_v_original_scaled
+    global current_screen_width, current_screen_height, g_v_original_scaled # Use current dimensions
     local_g_v_original_scaled = []
     vertices = []
     edges = []
@@ -57,27 +55,41 @@ def generate_random_planar_graph(n):
     for i in range(n):
         placed = False
         for _ in range(100):
-            new_vertex_pos = (random.randint(VERTEX_RADIUS, SCREEN_WIDTH - VERTEX_RADIUS),
-                              random.randint(VERTEX_RADIUS, SCREEN_HEIGHT - VERTEX_RADIUS))
+            # Generate using current_screen_width and current_screen_height
+            rand_x_max = max(VERTEX_RADIUS, current_screen_width - VERTEX_RADIUS)
+            rand_y_max = max(VERTEX_RADIUS, current_screen_height - VERTEX_RADIUS)
+            # Ensure min <= max for randint
+            x_coord = random.randint(VERTEX_RADIUS, rand_x_max if rand_x_max >= VERTEX_RADIUS else VERTEX_RADIUS)
+            y_coord = random.randint(VERTEX_RADIUS, rand_y_max if rand_y_max >= VERTEX_RADIUS else VERTEX_RADIUS)
+            new_vertex_pos = (x_coord, y_coord)
+
             too_close = False
             for v_pos in vertices:
                 if ((new_vertex_pos[0]-v_pos[0])**2 + (new_vertex_pos[1]-v_pos[1])**2) < min_dist_sq:
                     too_close = True; break
             if not too_close:
                 vertices.append(new_vertex_pos)
-                if initial_screen_width > 0 and initial_screen_height > 0: # Avoid division by zero
-                    scaled_x = new_vertex_pos[0] / initial_screen_width
-                    scaled_y = new_vertex_pos[1] / initial_screen_height
+                # Scale using current_screen_width and current_screen_height
+                if current_screen_width > 0 and current_screen_height > 0:
+                    scaled_x = new_vertex_pos[0] / current_screen_width
+                    scaled_y = new_vertex_pos[1] / current_screen_height
                     local_g_v_original_scaled.append((scaled_x, scaled_y))
                 else:
-                    local_g_v_original_scaled.append((0.5, 0.5)) # Default if dimensions unknown
+                    local_g_v_original_scaled.append((0.5, 0.5)) # Fallback
                 placed = True
                 break
-        if not placed:
-            vertices.append(new_vertex_pos) # Add anyway if no ideal spot
-            if initial_screen_width > 0 and initial_screen_height > 0:
-                scaled_x = new_vertex_pos[0] / initial_screen_width
-                scaled_y = new_vertex_pos[1] / initial_screen_height
+        if not placed: # If no ideal spot found after 100 tries, place it anyway
+            # Same generation and scaling logic as above
+            rand_x_max = max(VERTEX_RADIUS, current_screen_width - VERTEX_RADIUS)
+            rand_y_max = max(VERTEX_RADIUS, current_screen_height - VERTEX_RADIUS)
+            x_coord = random.randint(VERTEX_RADIUS, rand_x_max if rand_x_max >= VERTEX_RADIUS else VERTEX_RADIUS)
+            y_coord = random.randint(VERTEX_RADIUS, rand_y_max if rand_y_max >= VERTEX_RADIUS else VERTEX_RADIUS)
+            new_vertex_pos = (x_coord, y_coord) # new_vertex_pos was defined in the loop, re-define if not placed.
+
+            vertices.append(new_vertex_pos)
+            if current_screen_width > 0 and current_screen_height > 0:
+                scaled_x = new_vertex_pos[0] / current_screen_width
+                scaled_y = new_vertex_pos[1] / current_screen_height
                 local_g_v_original_scaled.append((scaled_x, scaled_y))
             else:
                 local_g_v_original_scaled.append((0.5, 0.5))
@@ -559,19 +571,17 @@ def main_game_session(win_fnt, stats_fnt, fixed_n_v=None):
 
 def main_application():
     global screen, current_screen_width, current_screen_height
-    global initial_screen_width, initial_screen_height # Ensure these are also global if accessed directly
     pygame.init()
 
-    # current_screen_width and current_screen_height are globally defined
-    # and initialized in step 2. Re-affirm their values before first screen creation.
+    # current_screen_width and current_screen_height are globally defined.
+    # Initialize them before first screen creation.
     current_screen_width = SCREEN_WIDTH
     current_screen_height = SCREEN_HEIGHT
     screen = pygame.display.set_mode((current_screen_width, current_screen_height), pygame.RESIZABLE)
     pygame.display.set_caption("Planarity")
 
-    initial_screen_width = SCREEN_WIDTH
-    initial_screen_height = SCREEN_HEIGHT
-    # current_screen_width and current_screen_height already set above
+    # initial_screen_width and initial_screen_height are removed.
+    # current_screen_width and current_screen_height are already set.
 
     win_fnt, stats_fnt = None, None
     try:
@@ -592,7 +602,7 @@ def main_application():
     num_vertices_for_game = DEFAULT_NUM_VERTICES
 
     input_text = ""
-    text_box_active = False
+    text_box_active = True # SET TO TRUE HERE
     error_message = ""
 
     running = True
@@ -638,7 +648,7 @@ def main_application():
                 num_vertices_for_game = DEFAULT_NUM_VERTICES
                 input_text = ""
                 error_message = ""
-                text_box_active = False
+                text_box_active = True # SET TO TRUE HERE
             elif game_status == "RESTART_SAME":
                 num_vertices_for_game = data
                 # current_state remains IN_GAME
