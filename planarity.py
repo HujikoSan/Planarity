@@ -1,4 +1,7 @@
-import pygame
+try:
+    import pygame
+except ModuleNotFoundError:  # Allow importing this module without pygame installed
+    pygame = None
 import random
 import webbrowser
 import urllib.parse
@@ -28,9 +31,15 @@ GREEN_EDGE_NON_CROSSING = (0, 150, 0)
 RED_EDGE_CROSSING = (200, 0, 0)
 WIN_MESSAGE_COLOR = (0, 128, 0)
 
-INPUT_BOX_COLOR_INACTIVE = pygame.Color('lightskyblue3')
-INPUT_BOX_COLOR_ACTIVE = pygame.Color('dodgerblue2')
-BUTTON_COLOR = pygame.Color('gray70') # A neutral button color
+if pygame:
+    INPUT_BOX_COLOR_INACTIVE = pygame.Color('lightskyblue3')
+    INPUT_BOX_COLOR_ACTIVE = pygame.Color('dodgerblue2')
+    BUTTON_COLOR = pygame.Color('gray70')  # A neutral button color
+else:
+    # Approximate RGB values for the named colors used when pygame is unavailable
+    INPUT_BOX_COLOR_INACTIVE = (141, 182, 205)
+    INPUT_BOX_COLOR_ACTIVE = (28, 134, 238)
+    BUTTON_COLOR = (179, 179, 179)
 BUTTON_TEXT_COLOR = BLACK
 ERROR_TEXT_COLOR = RED_VERTEX # Re-use existing red for errors
 PROMPT_TEXT_COLOR = BLACK
@@ -46,8 +55,20 @@ DEFAULT_NUM_VERTICES = 6
 MIN_VERTICES = 3
 MAX_VERTICES = 40
 
-def generate_random_planar_graph(n):
-    global current_screen_width, current_screen_height, g_v_original_scaled # Use current dimensions
+def generate_random_planar_graph(n, return_scaled=True):
+    """Generate a random planar graph with ``n`` vertices.
+
+    Parameters
+    ----------
+    n : int
+        Number of vertices to create.
+    return_scaled : bool, optional
+        If ``True`` (default) the function also returns a list of vertex
+        positions scaled relative to the current window size.  Setting this to
+        ``False`` allows tests or callers uninterested in the scaled
+        coordinates to receive only the vertices and edges.
+    """
+    global current_screen_width, current_screen_height, g_v_original_scaled  # Use current dimensions
     local_g_v_original_scaled = []
     vertices = []
     edges = []
@@ -97,11 +118,17 @@ def generate_random_planar_graph(n):
 
     if len(vertices) != n: n = len(vertices) # Adjust n if not all vertices could be placed ideally
 
-    if n == 0: return [], [], []
-    if n == 1: return vertices, [], local_g_v_original_scaled # Return scaled list even for 1 vertex
+    if n == 0:
+        g_v_original_scaled = local_g_v_original_scaled
+        return ([] , []) if not return_scaled else ([], [], local_g_v_original_scaled)
+    if n == 1:
+        g_v_original_scaled = local_g_v_original_scaled
+        return (vertices, []) if not return_scaled else (vertices, [], local_g_v_original_scaled)
     if n == 2:
-        if len(vertices) == 2: edges.append(tuple(sorted((0,1))))
-        return vertices, edges, local_g_v_original_scaled # Return scaled list for 2 vertices
+        if len(vertices) == 2:
+            edges.append(tuple(sorted((0, 1))) )
+        g_v_original_scaled = local_g_v_original_scaled
+        return (vertices, edges) if not return_scaled else (vertices, edges, local_g_v_original_scaled)
 
     v0,v1,v2 = 0,1,2; initial_edges=[tuple(sorted((v0,v1))),tuple(sorted((v1,v2))),tuple(sorted((v2,v0)))]
     edges.extend(initial_edges); faces = [(v0,v1,v2)]
@@ -130,7 +157,10 @@ def generate_random_planar_graph(n):
                 if is_connected(current_graph_edges,n): removed_count+=1
                 else: current_graph_edges.append(edge_cand)
             final_edges = current_graph_edges
-    return vertices, final_edges, local_g_v_original_scaled
+    g_v_original_scaled = local_g_v_original_scaled
+    if return_scaled:
+        return vertices, final_edges, local_g_v_original_scaled
+    return vertices, final_edges
 
 def is_connected(edges_list,num_vertices):
     if num_vertices<=1: return True;
@@ -388,7 +418,7 @@ def main_game_session(win_fnt, stats_fnt, fixed_n_v=None):
     # If fixed_n_v could be None or invalid, error handling or a default would be needed here.
     # For now, the design ensures main_application provides a valid number.
     global g_v_original_scaled
-    g_v, g_e, received_original_scaled = generate_random_planar_graph(n_v_sess)
+    g_v, g_e, received_original_scaled = generate_random_planar_graph(n_v_sess, return_scaled=True)
     g_v_original_scaled = received_original_scaled
     sel_v_idx, m_down = None,False; cross_set = get_crossing_edges(g_v,g_e)
     s_time, elap_s = pygame.time.get_ticks(),0.0; g_won,paused,p_s_ticks = False,False,0

@@ -194,7 +194,7 @@ class TestIsConnected(unittest.TestCase):
 class TestGenerateRandomPlanarGraph(unittest.TestCase):
     def _run_graph_generation_test(self, n_vertices):
         print(f"Testing graph generation for n_vertices = {n_vertices}") # Added print for long tests
-        vertices, edges = generate_random_planar_graph(n_vertices)
+        vertices, edges = generate_random_planar_graph(n_vertices, return_scaled=False)
 
         self.assertEqual(len(vertices), n_vertices, f"Expected {n_vertices} vertices, got {len(vertices)}")
 
