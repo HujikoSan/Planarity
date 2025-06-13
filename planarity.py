@@ -550,7 +550,7 @@ def main_game_session(win_fnt, stats_fnt, fixed_n_v=None):
             if paused_title:screen.blit(paused_title,paused_title.get_rect(center=(current_screen_width//2,y_s)));y_s+=60 # Use current_screen_width
 
             # Button data: text surface and corresponding rect object
-            # Note: 'reset_level_text' and 'quit_to_menu_text' seem to be undefined, using 'reset_txt' and 'quit_txt' which are defined
+            # The reset and quit button labels come from 'reset_txt' and 'quit_txt'
             btns_p_d = [{'s':resume_txt,'r':resume_button_rect},
                         {'s':reset_txt,'r':pause_reset_button_rect},
                         {'s':quit_txt,'r':pause_quit_button_rect}]
